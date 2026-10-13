@@ -1,0 +1,91 @@
+<template>
+	<view class="steps">
+		<view class="seg" v-for="(label, index) in steps" :key="index" :class="index < steps.length - 1 ? 'seg-grow' : ''">
+			<view class="step">
+				<view class="dot" :class="index + 1 <= current ? 'dot-on' : ''">
+					<text class="dot-text" :class="index + 1 <= current ? 'dot-text-on' : ''">{{ nodeText(index) }}</text>
+				</view>
+				<text class="step-label" :class="index + 1 <= current ? 'label-on' : ''">{{ label }}</text>
+			</view>
+			<view v-if="index < steps.length - 1" class="step-line"></view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 注册步骤条（原型 steps）：已过步骤显示 ✓ 且墨色高亮，未到步骤灰底灰字
+	const props = defineProps<{
+		steps : string[]
+		current : number
+	}>()
+
+	function nodeText(index : number) : string {
+		if (index + 1 <= props.current) {
+			return '✓'
+		}
+		return '' + (index + 1)
+	}
+</script>
+
+<style>
+	.steps {
+		flex-direction: row;
+		align-items: center;
+		margin: 4rpx 0 56rpx 0;
+	}
+
+	.seg {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.seg-grow {
+		flex: 1;
+	}
+
+	.step {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.dot {
+		width: 42rpx;
+		height: 42rpx;
+		border-radius: 21rpx;
+		background-color: #f0f0f0;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dot-on {
+		background-color: #111111;
+	}
+
+	.dot-text {
+		font-size: 22rpx;
+		font-weight: 700;
+		color: #b5b5b5;
+	}
+
+	.dot-text-on {
+		color: #ffffff;
+	}
+
+	.step-label {
+		font-size: 24rpx;
+		font-weight: 500;
+		color: #c4c4c4;
+		margin-left: 12rpx;
+	}
+
+	.label-on {
+		color: #111111;
+	}
+
+	.step-line {
+		flex: 1;
+		height: 1px;
+		background-color: #ececec;
+		margin: 0 16rpx;
+	}
+</style>

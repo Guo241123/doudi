@@ -1,0 +1,432 @@
+<template>
+	<view class="page">
+		<nav-bar title="交易" right-icon="search"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<!-- 广告 Banner：产品文档仅定义广告位（TRADE_BANNER）与上报接口，未定义 App 端素材拉取接口，暂作占位 -->
+			<view class="banner">
+				<text class="banner-text">广告 Banner · 最多 5 张轮播</text>
+				<view class="ad-tag"><text class="ad-tag-text">广告</text></view>
+				<view class="dots">
+					<view class="dot dot-on"></view>
+					<view class="dot"></view>
+					<view class="dot"></view>
+				</view>
+			</view>
+
+			<!-- 分类：2×4 八宫格（GET /trade/categories） -->
+			<view v-if="cats.length > 0" class="cats">
+				<view class="cat" v-for="(cat, i) in cats" :key="cat.id" @click="onCategory(cat)">
+					<view class="ci">
+						<image v-if="cat.iconUrl != ''" class="ci-img" :src="cat.iconUrl" mode="aspectFit"></image>
+						<svg-icon v-else :name="catIcon(cat.name)" :size="40"></svg-icon>
+					</view>
+					<text class="cat-name">{{ cat.name }}</text>
+				</view>
+			</view>
+
+			<!-- 首屏加载中 -->
+			<view v-if="loading && items.length == 0" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 首屏加载失败 -->
+			<view v-else-if="failed && items.length == 0" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<!-- 空数据 -->
+			<view v-else-if="items.length == 0" class="state">
+				<text class="state-text">暂无物品</text>
+			</view>
+
+			<!-- 双列物品流 -->
+			<view v-else>
+				<view class="item-grid">
+					<view class="item-wrap" v-for="(it, i) in items" :key="it.id">
+						<item-card
+							:title="it.title"
+							:price="it.price"
+							:sold="it.sold"
+							:cover-url="it.coverUrl"
+							:favorited="it.favorited"
+							@select="onItem(it.id)"
+							@favorite="onFav(i)"></item-card>
+					</view>
+				</view>
+				<view class="foot">
+					<text v-if="loading" class="foot-text">加载中…</text>
+					<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+					<text v-else class="foot-text">上拉加载更多</text>
+				</view>
+			</view>
+		</scroll-view>
+
+		<view class="fab" @click="onPublish">
+			<text class="fab-text">+</text>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 交易首页（原型 6，需求文档 4.2.1）：搜索 + 广告 Banner + 分类 2×4 + 双列物品流 + 悬浮发布
+	// 对接《接口文档》#17 分类列表、#18 物品列表（游标分页）
+	import { onShow } from '@dcloudio/uni-app'
+	import { trackPageView } from '../../utils/analytics.uts'
+	import { getCategories, getItemList, favoriteItem, unfavoriteItem } from '../../api/trade.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type Category = {
+		id : number
+		name : string
+		iconUrl : string
+	}
+
+	type TradeItem = {
+		id : number
+		title : string
+		price : string
+		sold : boolean
+		coverUrl : string
+		favorited : boolean
+	}
+
+	const PAGE_SIZE = 20
+
+	const cats = ref<Category[]>([])
+	const items = ref<TradeItem[]>([])
+	const cursor = ref(0)
+	const hasMore = ref(true)
+	const loading = ref(false)
+	const failed = ref(false)
+
+	// 后端未下发 iconUrl 时，按分类名回退到本地图标
+	function catIcon(name : string) : string {
+		if (name == '数码') return 'cat-digital'
+		if (name == '家电') return 'cat-appliance'
+		if (name == '服饰') return 'cat-clothes'
+		if (name == '图书') return 'cat-book'
+		if (name == '运动') return 'cat-sport'
+		if (name == '家居') return 'cat-home'
+		if (name == '美妆') return 'cat-beauty'
+		return 'cat-other'
+	}
+
+	// 价格（分）转元字符串
+	function fenToYuan(fen : number) : string {
+		const yuan = Math.floor(fen / 100)
+		const cent = fen % 100
+		if (cent == 0) {
+			return '' + yuan
+		}
+		let cs = '' + cent
+		if (cent < 10) {
+			cs = '0' + cs
+		}
+		return yuan + '.' + cs
+	}
+
+	function parseItem(o : UTSJSONObject) : TradeItem {
+		const status = o.getString('status') ?? 'ON_SALE'
+		const it : TradeItem = {
+			id: o.getNumber('id') ?? 0,
+			title: o.getString('title') ?? '',
+			price: fenToYuan(o.getNumber('priceFen') ?? 0),
+			sold: status == 'SOLD',
+			coverUrl: o.getString('coverUrl') ?? '',
+			favorited: o.getBoolean('favorited') ?? false
+		}
+		return it
+	}
+
+	function loadCategories() {
+		if (cats.value.length > 0) {
+			return
+		}
+		getCategories().then((data) => {
+			// #17 分类列表:data 直接是数组(不是 {list:[...]} 包装),之前按对象解析导致分类不显示
+			const list = data as Array<UTSJSONObject> | null
+			const arr : Category[] = []
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					const o = list[i]
+					const c : Category = {
+						id: o.getNumber('id') ?? 0,
+						name: o.getString('name') ?? '',
+						iconUrl: o.getString('iconUrl') ?? ''
+					}
+					arr.push(c)
+				}
+			}
+			cats.value = arr
+		}).catch((_) => {
+		})
+	}
+
+	// reset=true 回到首页（cursor=0）；否则按 nextCursor 续拉
+	function loadMore(reset : boolean) {
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			items.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getItemList(0, cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				failed.value = true
+				return
+			}
+			const list = obj.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					items.value.push(parseItem(list[i]))
+				}
+			}
+			cursor.value = obj.getNumber('nextCursor') ?? 0
+			hasMore.value = obj.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onShow(() => {
+		// #46 埋点：页面浏览
+		trackPageView('trade/index')
+		loadCategories()
+		if (items.value.length == 0) {
+			loadMore(true)
+		}
+	})
+
+
+	function reload() {
+		loadMore(true)
+	}
+
+
+	function onScrollLower() {
+		if (!loading.value && hasMore.value) {
+			loadMore(false)
+		}
+	}
+
+	function onCategory(cat : Category) {
+		uni.navigateTo({ url: '/pages/trade/category?id=' + cat.id + '&name=' + cat.name })
+	}
+
+	function onItem(id : number) {
+		uni.navigateTo({ url: '/pages/trade/detail?id=' + id })
+	}
+
+	// 收藏 / 取消收藏（幂等，见 #24）
+	function onFav(index : number) {
+		if (!isLogin()) {
+			uni.showModal({
+				title: '提示',
+				content: '收藏需要先登录',
+				confirmText: '去登录',
+				cancelText: '取消',
+				success: (r) => {
+					if (r.confirm) {
+						uni.navigateTo({ url: '/pages/login/index' })
+					}
+				}
+			})
+			return
+		}
+		const it = items.value[index]
+		const want = !it.favorited
+		if (want) {
+			favoriteItem(it.id).then((_) => {
+				it.favorited = true
+			}).catch((_) => {
+			})
+		} else {
+			unfavoriteItem(it.id).then((_) => {
+				it.favorited = false
+			}).catch((_) => {
+			})
+		}
+	}
+
+	function onPublish() {
+		uni.navigateTo({ url: '/pages/trade/publish' })
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.banner {
+		height: 253rpx;
+		border-radius: 28rpx;
+		background-image: linear-gradient(135deg, #2c2c2c, #767676);
+		margin: 28rpx 32rpx;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.banner-text {
+		font-size: 28rpx;
+		color: #ffffff;
+		letter-spacing: 2rpx;
+	}
+
+	.ad-tag {
+		position: absolute;
+		top: 18rpx;
+		right: 18rpx;
+		background-color: rgba(255, 255, 255, 0.28);
+		border-radius: 8rpx;
+		padding: 4rpx 12rpx;
+	}
+
+	.ad-tag-text {
+		font-size: 21rpx;
+		color: #ffffff;
+	}
+
+	.dots {
+		position: absolute;
+		bottom: 22rpx;
+		left: 0;
+		right: 0;
+		flex-direction: row;
+		justify-content: center;
+	}
+
+	.dot {
+		width: 10rpx;
+		height: 10rpx;
+		border-radius: 5rpx;
+		background-color: rgba(255, 255, 255, 0.45);
+		margin: 0 5rpx;
+	}
+
+	.dot-on {
+		width: 26rpx;
+		border-radius: 6rpx;
+		background-color: #ffffff;
+	}
+
+	.cats {
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding: 8rpx 28rpx 12rpx 28rpx;
+	}
+
+	.cat {
+		width: 25%;
+		flex-direction: column;
+		align-items: center;
+		margin-bottom: 28rpx;
+	}
+
+	.ci {
+		width: 98rpx;
+		height: 98rpx;
+		border-radius: 28rpx;
+		background-color: #f4f4f4;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ci-img {
+		width: 56rpx;
+		height: 56rpx;
+	}
+
+	.cat-name {
+		font-size: 26rpx;
+		color: #4a4a4a;
+		margin-top: 14rpx;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 140rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.item-grid {
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		padding: 8rpx 28rpx 0 28rpx;
+	}
+
+	.item-wrap {
+		width: 48.5%;
+		margin-bottom: 20rpx;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+
+	.fab {
+		position: fixed;
+		right: 32rpx;
+		bottom: 160rpx;
+		width: 112rpx;
+		height: 112rpx;
+		border-radius: 56rpx;
+		background-color: #111111;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.fab-text {
+		font-size: 60rpx;
+		font-weight: 300;
+		color: #ffffff;
+		line-height: 60rpx;
+	}
+</style>

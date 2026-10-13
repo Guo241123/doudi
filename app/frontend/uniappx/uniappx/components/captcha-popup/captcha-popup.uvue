@@ -1,0 +1,170 @@
+<template>
+	<view class="mask">
+		<view class="pop">
+			<text class="pop-title">请输入图形验证码</text>
+			<text class="pop-sub">用于防止短信验证码被恶意刷取</text>
+
+			<view class="cap-row">
+				<input class="cap-input" placeholder="图形验证码" placeholder-class="ph" v-model="code" :maxlength="6" />
+				<view class="cap-img" @click="onRefresh">
+					<image v-if="imageSrc != ''" class="cap-image" :src="imageSrc" mode="aspectFit"></image>
+					<text v-else class="cap-holder">{{ loading ? '加载中' : '点击刷新' }}</text>
+				</view>
+			</view>
+
+			<view class="pop-btns">
+				<view class="pop-btn" @click="onClose">
+					<text class="pop-btn-text">取消</text>
+				</view>
+				<view class="pop-btn pop-btn-dark" @click="onConfirm">
+					<text class="pop-btn-text-dark">确定</text>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 图形验证码弹窗（对应《接口文档》#0/#1）：图片由父页面拉取后传入，本组件只负责展示与收集答案
+	const props = defineProps<{
+		imageSrc : string
+		loading : boolean
+	}>()
+
+	const emit = defineEmits<{
+		(e : 'confirm', code : string) : void
+		(e : 'refresh') : void
+		(e : 'close') : void
+	}>()
+
+	const code = ref('')
+
+	function onRefresh() {
+		emit('refresh')
+	}
+
+	function onConfirm() {
+		if (code.value.length == 0) {
+			uni.showToast({ title: '请输入图形验证码', icon: 'none' })
+			return
+		}
+		emit('confirm', code.value)
+	}
+
+	function onClose() {
+		emit('close')
+	}
+</script>
+
+<style>
+	.mask {
+		position: fixed;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		background-color: rgba(0, 0, 0, 0.35);
+		align-items: center;
+		justify-content: center;
+		z-index: 999;
+	}
+
+	.pop {
+		width: 600rpx;
+		background-color: #ffffff;
+		border-radius: 24rpx;
+		padding: 44rpx 40rpx 32rpx 40rpx;
+		flex-direction: column;
+	}
+
+	.pop-title {
+		font-size: 34rpx;
+		font-weight: 700;
+		color: #111111;
+	}
+
+	.pop-sub {
+		font-size: 24rpx;
+		color: #aaaaaa;
+		margin-top: 12rpx;
+	}
+
+	.cap-row {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 36rpx;
+	}
+
+	.cap-input {
+		flex: 1;
+		height: 84rpx;
+		font-size: 30rpx;
+		color: #111111;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #ededed;
+		border-radius: 12rpx;
+		padding: 0 20rpx;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 28rpx;
+	}
+
+	.cap-img {
+		width: 220rpx;
+		height: 84rpx;
+		margin-left: 20rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #ededed;
+		border-radius: 12rpx;
+		background-color: #f7f7f7;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.cap-image {
+		width: 200rpx;
+		height: 70rpx;
+	}
+
+	.cap-holder {
+		font-size: 24rpx;
+		color: #b5b5b5;
+	}
+
+	.pop-btns {
+		flex-direction: row;
+		margin-top: 40rpx;
+	}
+
+	.pop-btn {
+		flex: 1;
+		height: 84rpx;
+		border-radius: 16rpx;
+		align-items: center;
+		justify-content: center;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #ededed;
+	}
+
+	.pop-btn-dark {
+		background-color: #111111;
+		border-color: #111111;
+		margin-left: 20rpx;
+	}
+
+	.pop-btn-text {
+		font-size: 30rpx;
+		color: #666666;
+	}
+
+	.pop-btn-text-dark {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+</style>

@@ -1,0 +1,250 @@
+<template>
+	<view class="page">
+		<nav-bar :title="catName" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<!-- 首屏加载中 -->
+			<view v-if="loading && items.length == 0" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 首屏加载失败 -->
+			<view v-else-if="failed && items.length == 0" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<!-- 空数据 -->
+			<view v-else-if="items.length == 0" class="state">
+				<text class="state-text">该分类暂无物品</text>
+			</view>
+
+			<view v-else>
+				<view class="item-grid">
+					<view class="item-wrap" v-for="(it, i) in items" :key="it.id">
+						<item-card
+							:title="it.title"
+							:price="it.price"
+							:sold="it.sold"
+							:cover-url="it.coverUrl"
+							:favorited="it.favorited"
+							@select="onItem(it.id)"
+							@favorite="onFav(i)"></item-card>
+					</view>
+				</view>
+				<view class="foot">
+					<text v-if="loading" class="foot-text">加载中…</text>
+					<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+					<text v-else class="foot-text">上拉加载更多</text>
+				</view>
+			</view>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 分类物品页（交易首页八宫格进入）：按 categoryId 拉取物品（游标分页）
+	// 说明：#18 仅支持 categoryId 筛选，无排序参数，故不提供排序控件
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getItemList, favoriteItem, unfavoriteItem } from '../../api/trade.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type TradeItem = {
+		id : number
+		title : string
+		price : string
+		sold : boolean
+		coverUrl : string
+		favorited : boolean
+	}
+
+	const PAGE_SIZE = 20
+
+	const catId = ref(0)
+	const catName = ref('')
+	const items = ref<TradeItem[]>([])
+	const cursor = ref(0)
+	const hasMore = ref(true)
+	const loading = ref(false)
+	const failed = ref(false)
+
+	function fenToYuan(fen : number) : string {
+		const yuan = Math.floor(fen / 100)
+		const cent = fen % 100
+		if (cent == 0) {
+			return '' + yuan
+		}
+		let cs = '' + cent
+		if (cent < 10) {
+			cs = '0' + cs
+		}
+		return yuan + '.' + cs
+	}
+
+	function parseItem(o : UTSJSONObject) : TradeItem {
+		const status = o.getString('status') ?? 'ON_SALE'
+		const it : TradeItem = {
+			id: o.getNumber('id') ?? 0,
+			title: o.getString('title') ?? '',
+			price: fenToYuan(o.getNumber('priceFen') ?? 0),
+			sold: status == 'SOLD',
+			coverUrl: o.getString('coverUrl') ?? '',
+			favorited: o.getBoolean('favorited') ?? false
+		}
+		return it
+	}
+
+	function loadMore(reset : boolean) {
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			items.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getItemList(catId.value, cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				failed.value = true
+				return
+			}
+			const list = obj.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					items.value.push(parseItem(list[i]))
+				}
+			}
+			cursor.value = obj.getNumber('nextCursor') ?? 0
+			hasMore.value = obj.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onLoad((query) => {
+		const idv = query['id']
+		if (idv != null) {
+			catId.value = parseInt(idv as string, 10)
+		}
+		const namev = query['name']
+		if (namev != null) {
+			catName.value = namev as string
+		}
+		if (catName.value == '') {
+			catName.value = '分类'
+		}
+		loadMore(true)
+	})
+
+	function reload() {
+		loadMore(true)
+	}
+
+
+	function onScrollLower() {
+		if (!loading.value && hasMore.value) {
+			loadMore(false)
+		}
+	}
+
+	function onItem(id : number) {
+		uni.navigateTo({ url: '/pages/trade/detail?id=' + id })
+	}
+
+	function onFav(index : number) {
+		if (!isLogin()) {
+			uni.showModal({
+				title: '提示',
+				content: '收藏需要先登录',
+				confirmText: '去登录',
+				cancelText: '取消',
+				success: (r) => {
+					if (r.confirm) {
+						uni.navigateTo({ url: '/pages/login/index' })
+					}
+				}
+			})
+			return
+		}
+		const it = items.value[index]
+		if (it.favorited) {
+			unfavoriteItem(it.id).then((_) => {
+				it.favorited = false
+			}).catch((_) => {
+			})
+		} else {
+			favoriteItem(it.id).then((_) => {
+				it.favorited = true
+			}).catch((_) => {
+			})
+		}
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 160rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.item-grid {
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		padding: 28rpx;
+	}
+
+	.item-wrap {
+		width: 48.5%;
+		margin-bottom: 20rpx;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+</style>

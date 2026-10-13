@@ -1,0 +1,113 @@
+// 认证与账号接口（对应《接口文档》2.1）
+// 登录/注册/短信相关接口统一 manual=true：错误码分支由页面处理（如 40401 去注册、40901 去登录）
+
+import { request } from './request.uts'
+
+// #0 获取图形验证码（占位）
+export function getCaptcha() : Promise<any> {
+	return request({ url: '/auth/captcha', method: 'GET', auth: false, manual: true })
+}
+
+// #1 发送短信验证码 scene: REGISTER/LOGIN/RESET/CHANGE_MOBILE
+export function sendSms(mobile : string, scene : string, captchaId : string, captchaCode : string) : Promise<any> {
+	return request({
+		url: '/auth/sms/send',
+		method: 'POST',
+		auth: false,
+		manual: true,
+		data: { mobile: mobile, scene: scene, captchaId: captchaId, captchaCode: captchaCode }
+	})
+}
+
+// #2 注册①：校验手机号与验证码 → registerToken
+export function registerCheckMobile(mobile : string, smsCode : string) : Promise<any> {
+	return request({ url: '/auth/register/check-mobile', method: 'POST', auth: false, manual: true, data: { mobile: mobile, smsCode: smsCode } })
+}
+
+// #3 注册②：设置密码
+export function registerPassword(registerToken : string, password : string, confirmPassword : string) : Promise<any> {
+	return request({
+		url: '/auth/register/password',
+		method: 'POST',
+		auth: false,
+		manual: true,
+		data: { registerToken: registerToken, password: password, confirmPassword: confirmPassword }
+	})
+}
+
+// #4 注册③：设置昵称，完成注册 → { token, user }
+export function registerNickname(registerToken : string, nickname : string, gender : string, avatarKey : string) : Promise<any> {
+	return request({
+		url: '/auth/register/nickname',
+		method: 'POST',
+		auth: false,
+		manual: true,
+		data: { registerToken: registerToken, nickname: nickname, gender: gender, avatarKey: avatarKey }
+	})
+}
+
+// #5 密码登录 → { token, user }
+export function loginByPassword(mobile : string, password : string) : Promise<any> {
+	return request({ url: '/auth/login/password', method: 'POST', auth: false, manual: true, data: { mobile: mobile, password: password } })
+}
+
+// #6 验证码登录 → { token, user }
+export function loginBySms(mobile : string, smsCode : string) : Promise<any> {
+	return request({ url: '/auth/login/sms', method: 'POST', auth: false, manual: true, data: { mobile: mobile, smsCode: smsCode } })
+}
+
+// #7 忘记密码-重置 → { token }
+export function resetPassword(mobile : string, smsCode : string, newPassword : string, confirmPassword : string) : Promise<any> {
+	return request({
+		url: '/auth/password/reset',
+		method: 'POST',
+		auth: false,
+		manual: true,
+		data: { mobile: mobile, smsCode: smsCode, newPassword: newPassword, confirmPassword: confirmPassword }
+	})
+}
+
+// #8 退出登录
+export function logout() : Promise<any> {
+	return request({ url: '/auth/logout', method: 'POST' })
+}
+
+// #9 注销账号
+export function deactivate() : Promise<any> {
+	return request({ url: '/user/deactivate', method: 'POST', data: { confirm: true } })
+}
+
+// #10 我的资料（页面自行渲染加载/失败态，故 manual=true）
+export function getProfile() : Promise<any> {
+	return request({ url: '/user/profile', method: 'GET', manual: true })
+}
+
+// #11 编辑资料（表单错误由页面提示）
+export function updateProfile(data : any) : Promise<any> {
+	return request({ url: '/user/profile', method: 'PUT', data: data, manual: true })
+}
+
+// #12 更换手机号（成功后所有 token 失效，需重新登录）
+export function changeMobile(newMobile : string, smsCode : string) : Promise<any> {
+	return request({ url: '/user/mobile', method: 'PUT', data: { newMobile: newMobile, smsCode: smsCode }, manual: true })
+}
+
+// #13 修改密码（成功后所有 token 失效，需重新登录）
+export function changePassword(oldPassword : string, smsCode : string, newPassword : string, confirmPassword : string) : Promise<any> {
+	return request({
+		url: '/user/password',
+		method: 'PUT',
+		data: { oldPassword: oldPassword, smsCode: smsCode, newPassword: newPassword, confirmPassword: confirmPassword },
+		manual: true
+	})
+}
+
+// #14 我的信息概览（我的页头部）：进入「我的」页刷新一次，失败静默不打扰
+export function getUserSummary() : Promise<any> {
+	return request({ url: '/user/summary', method: 'GET', silent: true })
+}
+
+// #26 获取 OSS 直传签名 fileType: IMAGE/VIDEO，biz: AVATAR/ITEM/POST
+export function getUploadToken(fileType : string, biz : string) : Promise<any> {
+	return request({ url: '/upload/token', method: 'POST', data: { fileType: fileType, biz: biz } })
+}

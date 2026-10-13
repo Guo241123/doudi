@@ -1,0 +1,110 @@
+// 登录注册表单校验工具（规则见《需求文档》4.1 与《接口文档》#3）
+
+// 手机号：11 位数字且以 1 开头
+export function isMobile(s : string) : boolean {
+	if (s.length != 11) {
+		return false
+	}
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i) ?? -1
+		if (c < 48 || c > 57) {
+			return false
+		}
+	}
+	return (s.charCodeAt(0) ?? -1) == 49
+}
+
+// 6 位数字短信验证码
+export function isSmsCode(s : string) : boolean {
+	if (s.length != 6) {
+		return false
+	}
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i) ?? -1
+		if (c < 48 || c > 57) {
+			return false
+		}
+	}
+	return true
+}
+
+export function hasDigit(s : string) : boolean {
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i) ?? -1
+		if (c >= 48 && c <= 57) {
+			return true
+		}
+	}
+	return false
+}
+
+export function hasLetter(s : string) : boolean {
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i) ?? -1
+		if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122)) {
+			return true
+		}
+	}
+	return false
+}
+
+export function hasUpper(s : string) : boolean {
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i) ?? -1
+		if (c >= 65 && c <= 90) {
+			return true
+		}
+	}
+	return false
+}
+
+export function hasSymbol(s : string) : boolean {
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i) ?? -1
+		const isDigit = c >= 48 && c <= 57
+		const isLetter = (c >= 65 && c <= 90) || (c >= 97 && c <= 122)
+		if (!isDigit && !isLetter) {
+			return true
+		}
+	}
+	return false
+}
+
+// 密码规则：长度 8～20 位、必须包含字母与数字（《接口文档》#3）
+export function pwdLengthOk(s : string) : boolean {
+	const n = s.length
+	return n >= 8 && n <= 20
+}
+
+export function pwdMixOk(s : string) : boolean {
+	return hasLetter(s) && hasDigit(s)
+}
+
+// 建议项：包含大写字母或符号
+export function pwdStrongOk(s : string) : boolean {
+	return hasUpper(s) || hasSymbol(s)
+}
+
+// 密码强度 0～3（对应强度条三格）
+export function pwdStrength(s : string) : number {
+	if (s == '') {
+		return 0
+	}
+	let n = 0
+	if (pwdLengthOk(s)) {
+		n++
+	}
+	if (pwdMixOk(s)) {
+		n++
+	}
+	if (pwdStrongOk(s)) {
+		n++
+	}
+	return n
+}
+
+// 昵称：1～12 字（去首尾空格后，《接口文档》#4）
+export function isNickname(s : string) : boolean {
+	const t = s.trim()
+	return t.length >= 1 && t.length <= 12
+}

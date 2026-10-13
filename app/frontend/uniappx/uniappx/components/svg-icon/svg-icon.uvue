@@ -1,0 +1,27 @@
+<template>
+	<image class="svg-icon" :src="src" :style="sizeStyle" mode="aspectFit"></image>
+</template>
+
+<script setup lang="uts">
+	// 通用 SVG 图标组件：图标文件位于 /static/icons/{name}.svg
+	// 用法：<svg-icon name="like" :size="44" />
+	const props = defineProps<{
+		name : string
+		size ?: number
+	}>()
+
+	const src = computed<string>(() : string => {
+		return '/static/icons/' + props.name + '.svg'
+	})
+
+	const sizeStyle = computed<string>(() : string => {
+		const s = props.size ?? 40
+		return 'width:' + s + 'rpx;height:' + s + 'rpx;'
+	})
+</script>
+
+<style>
+	.svg-icon {
+		flex-shrink: 0;
+	}
+</style>

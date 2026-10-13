@@ -1,0 +1,71 @@
+// 论坛模块接口（对应《接口文档》2.6）
+// 只读列表/详情由页面自行渲染「加载中 / 失败重试 / 空」状态，故 manual=true 关闭统一 toast
+
+import { request } from './request.uts'
+
+// #27 信息流（混排 POST / AD）
+export function getFeed(cursor : number, size : number) : Promise<any> {
+	return request({ url: '/forum/feed?cursor=' + cursor + '&size=' + size, method: 'GET', auth: false, manual: true })
+}
+
+// #28 发帖（先发后审，命中敏感词返回 40002）
+export function publishPost(content : string, images : string[], videoKey : string) : Promise<any> {
+	return request({ url: '/forum/posts', method: 'POST', data: { content: content, images: images, videoKey: videoKey } })
+}
+
+// #29 帖子详情
+export function getPostDetail(id : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + id, method: 'GET', manual: true })
+}
+
+// #30 帖子点赞 / 取消
+export function likePost(id : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + id + '/like', method: 'POST' })
+}
+
+export function unlikePost(id : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + id + '/like', method: 'DELETE' })
+}
+
+// #31 帖子收藏 / 取消（详情页入口）
+export function favoritePost(id : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + id + '/favorite', method: 'POST' })
+}
+
+export function unfavoritePost(id : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + id + '/favorite', method: 'DELETE' })
+}
+
+// #32 评论列表（热评前置）
+export function getComments(postId : number, cursor : number, size : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + postId + '/comments?cursor=' + cursor + '&size=' + size, method: 'GET', auth: false, manual: true })
+}
+
+// #33 发表评论 / 回复
+export function addComment(postId : number, content : string, replyToCommentId : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + postId + '/comments', method: 'POST', data: { content: content, replyToCommentId: replyToCommentId } })
+}
+
+// #34 评论点赞 / 取消
+export function likeComment(id : number) : Promise<any> {
+	return request({ url: '/forum/comments/' + id + '/like', method: 'POST' })
+}
+
+export function unlikeComment(id : number) : Promise<any> {
+	return request({ url: '/forum/comments/' + id + '/like', method: 'DELETE' })
+}
+
+// #35 删除自己的帖子
+export function deletePost(id : number) : Promise<any> {
+	return request({ url: '/forum/posts/' + id, method: 'DELETE' })
+}
+
+// 我发布的帖子（联调期新增接口，游标分页）
+export function getMyPosts(cursor : number, size : number) : Promise<any> {
+	return request({ url: '/forum/my-posts?cursor=' + cursor + '&size=' + size, method: 'GET', manual: true })
+}
+
+// 我收藏的帖子（联调期新增接口；unavailable=true 表示原帖已删/不可见）
+export function getMyFavoritePosts(cursor : number, size : number) : Promise<any> {
+	return request({ url: '/forum/my-favorites?cursor=' + cursor + '&size=' + size, method: 'GET', manual: true })
+}

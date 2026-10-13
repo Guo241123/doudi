@@ -1,0 +1,308 @@
+<template>
+	<view class="page">
+		<nav-bar title="举报" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<view class="report-tip">
+				<text class="rt-b">为什么要举报？</text>
+				<text class="rt-t">你的举报将帮助平台维护社区秩序。请选择最符合的举报原因，我们会尽快核实处理。</text>
+			</view>
+
+			<view class="report-target">
+				<text class="tg-k">举报对象</text>
+				<text class="tg-v">{{ targetText }}</text>
+			</view>
+
+			<text class="hint">请选择举报原因</text>
+			<view class="radio-list">
+				<view class="radio-item" v-for="(r, i) in reasons" :key="i" @click="onPick(i)">
+					<view class="radio-dot" :class="selected == i ? 'radio-dot-on' : ''">
+						<view v-if="selected == i" class="radio-dot-inner"></view>
+					</view>
+					<text class="radio-text">{{ r.name }}</text>
+				</view>
+			</view>
+
+			<view class="report-textarea">
+				<textarea class="rta" placeholder="补充说明（选填）" placeholder-class="ph" v-model="note" :maxlength="200" />
+				<text class="rt-count">{{ note.length }} / 200</text>
+			</view>
+
+			<view class="report-submit">
+				<view class="btn-dark" :class="submitting ? 'btn-disabled' : ''" @click="onSubmit">
+					<text class="btn-dark-text">{{ submitting ? '提交中…' : '提交举报' }}</text>
+				</view>
+				<text class="report-note">提交后将由管理员核实处理，处理结果会在「消息通知」中告知</text>
+			</view>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 举报页（需求 4.7.1，原型 15）：举报对象 + 原因单选 + 补充说明 + 提交
+	// 对接《接口文档》#41 举报页元数据、#42 提交举报
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getReportMeta, submitReport } from '../../api/report.uts'
+	import { isLogin } from '../../utils/token.uts'
+	import { errorMessage } from '../../api/request.uts'
+
+	type Meta = {
+		code : string
+		name : string
+	}
+
+	const reasons = ref<Meta[]>([])
+	const selected = ref(-1)
+	const note = ref('')
+	const targetType = ref('POST')
+	const targetId = ref(0)
+	const targetTypeName = ref('')
+	const submitting = ref(false)
+
+	const targetText = computed<string>(() : string => {
+		const t = targetTypeName.value != '' ? targetTypeName.value : '内容'
+		if (targetId.value > 0) {
+			return t + '（ID：' + targetId.value + '）'
+		}
+		return t
+	})
+
+	function loadMeta() {
+		getReportMeta().then((data) => {
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				return
+			}
+			const rs = o.getArray<UTSJSONObject>('reasons')
+			const arr : Meta[] = []
+			if (rs != null) {
+				for (let i = 0; i < rs.length; i++) {
+					const m : Meta = {
+						code: rs[i].getString('code') ?? '',
+						name: rs[i].getString('name') ?? ''
+					}
+					arr.push(m)
+				}
+			}
+			reasons.value = arr
+
+			const ts = o.getArray<UTSJSONObject>('targetTypes')
+			if (ts != null) {
+				for (let i = 0; i < ts.length; i++) {
+					if ((ts[i].getString('code') ?? '') == targetType.value) {
+						targetTypeName.value = ts[i].getString('name') ?? ''
+						break
+					}
+				}
+			}
+		}).catch((_) => {
+		})
+	}
+
+	onLoad((query) => {
+		const t = query['targetType']
+		if (t != null) {
+			targetType.value = t as string
+		}
+		const idv = query['targetId']
+		if (idv != null) {
+			targetId.value = parseInt(idv as string, 10)
+		}
+		loadMeta()
+	})
+
+
+	function onPick(i : number) {
+		selected.value = i
+	}
+
+	function onSubmit() {
+		if (submitting.value) {
+			return
+		}
+		if (!isLogin()) {
+			uni.showModal({
+				title: '提示',
+				content: '举报需要先登录',
+				confirmText: '去登录',
+				cancelText: '取消',
+				success: (r) => {
+					if (r.confirm) {
+						uni.navigateTo({ url: '/pages/login/index' })
+					}
+				}
+			})
+			return
+		}
+		if (targetId.value <= 0) {
+			uni.showToast({ title: '举报对象无效', icon: 'none' })
+			return
+		}
+		if (selected.value < 0) {
+			uni.showToast({ title: '请选择举报原因', icon: 'none' })
+			return
+		}
+		const reason = reasons.value[selected.value].code
+		submitting.value = true
+		submitReport(targetType.value, targetId.value, reason, note.value).then((_) => {
+			submitting.value = false
+			uni.showToast({ title: '举报已提交', icon: 'none' })
+			setTimeout(() => {
+				uni.navigateBack()
+			}, 800)
+		}).catch((e) => {
+			submitting.value = false
+			uni.showToast({ title: errorMessage(e), icon: 'none' })
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.report-tip {
+		margin: 28rpx 32rpx;
+		padding: 24rpx 28rpx;
+		background-color: #f7f7f7;
+		border-radius: 18rpx;
+	}
+
+	.rt-b {
+		font-size: 27rpx;
+		font-weight: 700;
+		color: #333333;
+	}
+
+	.rt-t {
+		font-size: 25rpx;
+		line-height: 42rpx;
+		color: #777777;
+		margin-top: 8rpx;
+	}
+
+	.report-target {
+		padding: 0 32rpx 20rpx 32rpx;
+	}
+
+	.tg-k {
+		font-size: 25rpx;
+		color: #999999;
+	}
+
+	.tg-v {
+		font-size: 27rpx;
+		line-height: 42rpx;
+		color: #333333;
+		margin-top: 10rpx;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		color: #999999;
+		padding: 4rpx 32rpx 12rpx 32rpx;
+	}
+
+	.radio-list {
+		padding: 0 32rpx;
+	}
+
+	.radio-item {
+		flex-direction: row;
+		align-items: center;
+		padding: 26rpx 0;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.radio-dot {
+		width: 36rpx;
+		height: 36rpx;
+		border-radius: 18rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #cccccc;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.radio-dot-on {
+		border-color: #111111;
+	}
+
+	.radio-dot-inner {
+		width: 20rpx;
+		height: 20rpx;
+		border-radius: 10rpx;
+		background-color: #111111;
+	}
+
+	.radio-text {
+		font-size: 29rpx;
+		color: #333333;
+		margin-left: 20rpx;
+	}
+
+	.report-textarea {
+		margin: 28rpx 32rpx;
+		background-color: #f7f7f7;
+		border-radius: 18rpx;
+		padding: 24rpx;
+	}
+
+	.rta {
+		width: 100%;
+		height: 160rpx;
+		font-size: 28rpx;
+		line-height: 44rpx;
+		color: #111111;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 28rpx;
+	}
+
+	.rt-count {
+		font-size: 22rpx;
+		color: #c2c2c2;
+		text-align: right;
+		margin-top: 10rpx;
+	}
+
+	.report-submit {
+		padding: 12rpx 32rpx 60rpx 32rpx;
+	}
+
+	.btn-dark {
+		background-color: #111111;
+		border-radius: 20rpx;
+		padding: 32rpx;
+		align-items: center;
+	}
+
+	.btn-disabled {
+		background-color: #999999;
+	}
+
+	.btn-dark-text {
+		font-size: 31rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.report-note {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+		text-align: center;
+		margin-top: 18rpx;
+	}
+</style>

@@ -1,0 +1,147 @@
+<template>
+	<view class="item" :class="unavailable == true ? 'item-off' : ''" @click="onTap">
+		<view class="thumb">
+			<image v-if="coverUrl != null && coverUrl != ''" class="thumb-img" :src="coverUrl" mode="aspectFill"></image>
+			<text v-else class="thumb-text">图片</text>
+		</view>
+		<view v-if="showFav == true" class="fav" @click.stop="onFav">
+			<svg-icon :name="favorited == true ? 'heart-filled' : 'heart'" :size="26"></svg-icon>
+		</view>
+		<view class="info">
+			<text class="t">{{ title }}</text>
+			<view class="row">
+				<view class="price">
+					<text class="price-sym">¥</text>
+					<text class="price-num">{{ price }}</text>
+				</view>
+				<text class="tag" :class="sold ? 'tag-off' : 'tag-on'">{{ sold ? '已售' : '在售' }}</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 二手物品卡片（原型 .item，双列流）：封面图/视频首帧 / 标题两行 / 价格 / 在售-已售
+	// 收藏爱心默认不显示(showFav),只在「我的收藏」页开启(作为取消收藏入口)
+	const props = defineProps<{
+		title : string
+		price : string
+		sold : boolean
+		coverUrl ?: string
+		favorited ?: boolean
+		unavailable ?: boolean
+		showFav ?: boolean
+	}>()
+
+	const emit = defineEmits<{
+		(e : 'select') : void
+		(e : 'favorite') : void
+	}>()
+
+	function onTap() {
+		emit('select')
+	}
+
+	function onFav() {
+		emit('favorite')
+	}
+</script>
+
+<style>
+	.item {
+		flex-direction: column;
+		background-color: #ffffff;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #f1f1f1;
+		border-radius: 24rpx;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.item-off {
+		opacity: 0.5;
+	}
+
+	.thumb {
+		height: 225rpx;
+		background-color: #f2f2f2;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.thumb-img {
+		width: 100%;
+		height: 225rpx;
+	}
+
+	.thumb-text {
+		font-size: 26rpx;
+		color: #c9c9c9;
+	}
+
+	.fav {
+		position: absolute;
+		top: 14rpx;
+		right: 14rpx;
+		width: 48rpx;
+		height: 48rpx;
+		border-radius: 24rpx;
+		background-color: rgba(255, 255, 255, 0.92);
+		align-items: center;
+		justify-content: center;
+	}
+
+	.info {
+		padding: 18rpx 20rpx 22rpx 20rpx;
+	}
+
+	.t {
+		font-size: 28rpx;
+		line-height: 40rpx;
+		color: #222222;
+		height: 82rpx;
+		lines: 2;
+		text-overflow: ellipsis;
+	}
+
+	.row {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-top: 16rpx;
+	}
+
+	.price {
+		flex-direction: row;
+		align-items: flex-end;
+	}
+
+	.price-sym {
+		font-size: 24rpx;
+		font-weight: 500;
+		color: #111111;
+	}
+
+	.price-num {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #111111;
+	}
+
+	.tag {
+		font-size: 21rpx;
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+	}
+
+	.tag-on {
+		background-color: #111111;
+		color: #ffffff;
+	}
+
+	.tag-off {
+		background-color: #e8e8e8;
+		color: #9a9a9a;
+	}
+</style>

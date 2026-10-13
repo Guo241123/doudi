@@ -1,0 +1,158 @@
+<template>
+	<view class="page">
+		<nav-bar title="客服" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<view class="hero">
+				<view class="hero-avatar"></view>
+				<text class="hero-title">平台客服</text>
+				<text class="hero-sub">工作时间 9:00–18:00 · 咨询规则 / 反馈问题</text>
+			</view>
+
+			<view class="menu">
+				<view class="menu-item" @click="onChat">
+					<text class="mi-label">在线客服会话</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onCopy('wechat')">
+					<text class="mi-label">微信</text>
+					<text class="mi-val">kefu_shequ</text>
+				</view>
+				<view class="menu-item" @click="onCopy('qq')">
+					<text class="mi-label">QQ</text>
+					<text class="mi-val">800123456</text>
+				</view>
+				<view class="menu-item" @click="onCall">
+					<text class="mi-label">电话</text>
+					<text class="mi-val">400-000-0000</text>
+				</view>
+			</view>
+
+			<text class="hint">客服用于咨询平台规则、反馈问题；任务模块的「联系任务负责人」用于对接具体工作，两者不是同一入口。</text>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 客服入口（平台客服）：在线会话 + 第三方联系方式
+	// 在线会话先 #36 发起/复用 CUSTOMER 会话，拿到 conversationId 再进会话页
+	import { createConversation } from '../../api/message.uts'
+	import { errorMessage } from '../../api/request.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	const opening = ref(false)
+
+	function onChat() {
+		if (!isLogin()) {
+			uni.navigateTo({ url: '/pages/login/index' })
+			return
+		}
+		if (opening.value) {
+			return
+		}
+		opening.value = true
+		createConversation('CUSTOMER', 0, 0).then((data) => {
+			opening.value = false
+			const o = data as UTSJSONObject | null
+			const cid = o == null ? 0 : (o.getNumber('conversationId') ?? 0)
+			if (cid <= 0) {
+				uni.showToast({ title: '会话创建失败，请重试', icon: 'none' })
+				return
+			}
+			uni.navigateTo({ url: '/pages/message/chat?conversationId=' + cid + '&type=CUSTOMER&title=' + encodeURIComponent('平台客服') })
+		}).catch((e) => {
+			opening.value = false
+			uni.showToast({ title: errorMessage(e), icon: 'none' })
+		})
+	}
+
+	function onCopy(kind : string) {
+		const val = kind == 'wechat' ? 'kefu_shequ' : '800123456'
+		uni.setClipboardData({
+			data: val,
+			success: () => {
+				uni.showToast({ title: '已复制', icon: 'none' })
+			}
+		})
+	}
+
+	function onCall() {
+		uni.makePhoneCall({
+			phoneNumber: '4000000000'
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.hero {
+		flex-direction: column;
+		align-items: center;
+		padding: 56rpx 0 40rpx 0;
+	}
+
+	.hero-avatar {
+		width: 140rpx;
+		height: 140rpx;
+		border-radius: 70rpx;
+		background-color: #eaeaea;
+	}
+
+	.hero-title {
+		font-size: 34rpx;
+		font-weight: 700;
+		color: #111111;
+		margin-top: 24rpx;
+	}
+
+	.hero-sub {
+		font-size: 24rpx;
+		color: #999999;
+		margin-top: 12rpx;
+	}
+
+	.menu {
+		padding: 0 32rpx;
+	}
+
+	.menu-item {
+		flex-direction: row;
+		align-items: center;
+		padding: 32rpx 0;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.mi-label {
+		flex: 1;
+		font-size: 30rpx;
+		color: #222222;
+	}
+
+	.mi-val {
+		font-size: 26rpx;
+		color: #999999;
+		margin-right: 12rpx;
+	}
+
+	.arrow {
+		font-size: 34rpx;
+		color: #cccccc;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+		padding: 28rpx 32rpx;
+	}
+</style>

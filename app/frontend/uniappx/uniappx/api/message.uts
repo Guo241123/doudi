@@ -1,0 +1,37 @@
+// 站内信 / 消息中心接口（对应《接口文档》2.7）
+
+import { request } from './request.uts'
+
+// #36 发起 / 复用会话 type: TASK_CONSULT/CUSTOMER/TRADE
+// peerUserId 仅 TRADE 需要、taskId 仅 TASK_CONSULT 需要，为 0 时不传（避免后端参数校验失败）
+export function createConversation(type : string, peerUserId : number, taskId : number) : Promise<any> {
+	const body = {} as UTSJSONObject
+	body['type'] = type
+	if (peerUserId > 0) {
+		body['peerUserId'] = peerUserId
+	}
+	if (taskId > 0) {
+		body['taskId'] = taskId
+	}
+	return request({ url: '/messages/conversations', method: 'POST', data: body, manual: true })
+}
+
+// #37 会话列表
+export function getConversations(type : string, cursor : number, size : number) : Promise<any> {
+	return request({ url: '/messages/conversations?type=' + type + '&cursor=' + cursor + '&size=' + size, method: 'GET' })
+}
+
+// #38 会话内消息
+export function getMessages(conversationId : number, cursor : number, size : number) : Promise<any> {
+	return request({ url: '/messages/conversations/' + conversationId + '/messages?cursor=' + cursor + '&size=' + size, method: 'GET' })
+}
+
+// #39 发送消息
+export function sendMessage(conversationId : number, content : string) : Promise<any> {
+	return request({ url: '/messages/conversations/' + conversationId + '/messages', method: 'POST', data: { content: content } })
+}
+
+// #40 未读数（轮询接口：会话页 5s / 前台 30s / 后台停止）
+export function getUnreadCount() : Promise<any> {
+	return request({ url: '/messages/unread-count', method: 'GET', silent: true })
+}

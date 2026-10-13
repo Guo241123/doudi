@@ -1,0 +1,103 @@
+// 网络请求统一封装（App 端唯一出口）
+// 对应《工程骨架搭建指南》2.4 与《接口文档》1.2 统一返回体、1.5 错误码表
+// 职责：baseURL、token 注入、统一返回体处理、40101 跳登录、失败静默/手动处理开关
+
+import { getToken, clearToken } from '../utils/token.uts'
+
+// 后端地址：真机调试请改为「电脑局域网 IP」（手机与电脑需在同一 WiFi），不要用 localhost
+// ⚠️ 此 IP 会随换网/换热点变化，网络异常时先用 ipconfig 核对（2026-10-12 晚：192.168.187.70）
+const BASE_URL = 'http://192.168.187.70:8080/api/v1'
+
+export type RequestConfig = {
+	url : string
+	method ?: string
+	data ?: any | null
+	auth ?: boolean // 是否携带 token，默认 true
+	silent ?: boolean // 失败是否静默（广告/埋点上报用），默认 false
+	manual ?: boolean // 是否由调用方自行处理错误（登录/注册需按错误码分支），默认 false
+}
+
+// 统一错误对象（reject 时抛出）：{ code, message }
+function makeError(code : number, message : string) : UTSJSONObject {
+	const o = {} as UTSJSONObject
+	o['code'] = code
+	o['message'] = message
+	return o
+}
+
+// 从 catch 到的错误里取业务码（非业务错误返回 -1）
+export function errorCode(e : any | null) : number {
+	const o = e as UTSJSONObject | null
+	if (o == null) {
+		return -1
+	}
+	return o.getNumber('code') ?? -1
+}
+
+// 从 catch 到的错误里取提示文案
+export function errorMessage(e : any | null) : string {
+	const o = e as UTSJSONObject | null
+	if (o == null) {
+		return '网络异常'
+	}
+	return o.getString('message') ?? '请求失败'
+}
+
+export function request(config : RequestConfig) : Promise<any> {
+	return new Promise<any>((resolve, reject) => {
+		const header = {} as UTSJSONObject
+		header['Content-Type'] = 'application/json'
+
+		const needAuth = config.auth ?? true
+		if (needAuth) {
+			const token = getToken()
+			if (token != '') {
+				header['Authorization'] = 'Bearer ' + token
+			}
+		}
+
+		const silent = config.silent ?? false
+		const manual = config.manual ?? false
+
+		uni.request({
+			url: BASE_URL + config.url,
+			method: (config.method ?? 'GET') as RequestMethod,
+			data: config.data,
+			header: header,
+			success: (res) => {
+				const body = res.data as UTSJSONObject | null
+				if (body == null) {
+					reject(makeError(-1, '响应数据为空'))
+					return
+				}
+				const code = body.getNumber('code') ?? -1
+				const message = body.getString('message') ?? '请求失败'
+				if (code == 0) {
+					// data 可能为 null(很多写操作 data:null);resolve 参数非空,用空对象兜底(调用方均有空值保护)
+					resolve(body['data'] ?? ({} as UTSJSONObject))
+					return
+				}
+				if (code == 40101) {
+					// 未登录 / token 失效：清 token 并引导登录
+					clearToken()
+					if (!manual) {
+						uni.navigateTo({ url: '/pages/login/index' })
+					}
+					reject(makeError(code, message))
+					return
+				}
+				// 其余业务错误：统一弹 message（调用方自行处理时传 manual=true）
+				if (!manual && !silent) {
+					uni.showToast({ title: message, icon: 'none' })
+				}
+				reject(makeError(code, message))
+			},
+			fail: (_) => {
+				if (!manual && !silent) {
+					uni.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
+				}
+				reject(makeError(-1, '网络异常'))
+			}
+		})
+	})
+}

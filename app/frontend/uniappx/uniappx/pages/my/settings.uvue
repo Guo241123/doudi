@@ -1,0 +1,245 @@
+<template>
+	<view class="page">
+		<nav-bar title="设置" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<view class="menu">
+				<view class="menu-item" @click="onAccount">
+					<text class="mi-label">账号安全</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onWeb('隐私政策')">
+					<text class="mi-label">隐私政策</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onWeb('用户协议')">
+					<text class="mi-label">用户协议</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onBlacklist">
+					<text class="mi-label">黑名单管理</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onClear">
+					<text class="mi-label">清除缓存</text>
+					<text class="mi-val">{{ cacheText }}</text>
+				</view>
+				<view class="menu-item" @click="onWeb('关于我们')">
+					<text class="mi-label">关于我们</text>
+					<text class="arrow">›</text>
+				</view>
+			</view>
+
+			<template v-if="logged">
+				<view class="divider"></view>
+
+				<view class="menu">
+					<view class="menu-item" @click="onLogout">
+						<text class="mi-label">退出登录</text>
+						<text class="arrow">›</text>
+					</view>
+					<view class="menu-item" @click="onDelete">
+						<text class="mi-label mi-danger">注销账号</text>
+						<text class="arrow">›</text>
+					</view>
+				</view>
+
+				<text class="hint">注销说明：提交后 7 天内完成处理，处理期内该账号禁止登录与发布内容。此操作不可撤销。</text>
+			</template>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 设置（需求 4.5.5，原型 19）：账号安全 / 协议 / 黑名单 / 缓存 / 关于 / 退出 / 注销
+	// 退出登录对接《接口文档》#8，注销对接 #9；账号安全对接 #12/#13
+	import { onShow } from '@dcloudio/uni-app'
+	import { logout, deactivate } from '../../api/auth.uts'
+	import { clearToken, isLogin } from '../../utils/token.uts'
+
+	// 清理缓存时保留登录态相关 key
+	const PRESERVE_KEYS : string[] = ['shequ_token', 'shequ_user', 'shequ_register_token', 'shequ_mobile']
+
+	const logged = ref(false)
+	const cacheText = ref('0 KB')
+
+	function refreshCache() {
+		const info = uni.getStorageInfoSync()
+		const kb = info.currentSize
+		if (kb >= 1024) {
+			cacheText.value = (kb / 1024).toFixed(1) + ' MB'
+		} else {
+			cacheText.value = kb.toString() + ' KB'
+		}
+	}
+
+	onShow(() => {
+		logged.value = isLogin()
+		refreshCache()
+	})
+
+
+	function requireLogin() : boolean {
+		if (!logged.value) {
+			uni.navigateTo({ url: '/pages/login/index' })
+			return false
+		}
+		return true
+	}
+
+	function onAccount() {
+		if (!requireLogin()) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/my/security' })
+	}
+
+	function onWeb(title : string) {
+		uni.navigateTo({ url: '/pages/common/webview?title=' + title })
+	}
+
+	function onBlacklist() {
+		if (!requireLogin()) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/my/blacklist' })
+	}
+
+	function isPreserveKey(k : string) : boolean {
+		for (let i = 0; i < PRESERVE_KEYS.length; i++) {
+			if (PRESERVE_KEYS[i] == k) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// 清理本地缓存（保留登录态），非登录数据全部移除
+	function onClear() {
+		uni.showModal({
+			title: '清除缓存',
+			content: '将清除本地缓存数据，不影响登录状态。确定继续吗？',
+			success: (res) => {
+				if (!res.confirm) {
+					return
+				}
+				const info = uni.getStorageInfoSync()
+				const keys = info.keys
+				for (let i = 0; i < keys.length; i++) {
+					const k = keys[i]
+					if (!isPreserveKey(k)) {
+						uni.removeStorageSync(k)
+					}
+				}
+				refreshCache()
+				uni.showToast({ title: '缓存已清除', icon: 'none' })
+			}
+		})
+	}
+
+
+	function toLogin() {
+		clearToken()
+		uni.reLaunch({ url: '/pages/login/index' })
+	}
+
+	function onLogout() {
+		uni.showModal({
+			title: '退出登录',
+			content: '确定要退出当前账号吗？',
+			success: (res) => {
+				if (!res.confirm) {
+					return
+				}
+				uni.showLoading({ title: '退出中', mask: true })
+				logout().then((_) => {
+					uni.hideLoading()
+					toLogin()
+				}).catch((_) => {
+					// 即使服务端退出失败，本地登录态也要清除
+					uni.hideLoading()
+					toLogin()
+				})
+			}
+		})
+	}
+
+	function onDelete() {
+		uni.showModal({
+			title: '注销账号',
+			content: '提交后 7 天内完成处理，处理期内禁止登录与发布内容。此操作不可撤销。',
+			success: (res) => {
+				if (!res.confirm) {
+					return
+				}
+				uni.showLoading({ title: '提交中', mask: true })
+				deactivate().then((_) => {
+					uni.hideLoading()
+					uni.showToast({ title: '已提交注销申请', icon: 'none' })
+					toLogin()
+				}).catch((_) => {
+					uni.hideLoading()
+				})
+			}
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.menu {
+		padding: 8rpx 32rpx 0 32rpx;
+	}
+
+	.menu-item {
+		flex-direction: row;
+		align-items: center;
+		padding: 32rpx 0;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.mi-label {
+		flex: 1;
+		font-size: 30rpx;
+		color: #222222;
+	}
+
+	.mi-danger {
+		color: #111111;
+		font-weight: 600;
+	}
+
+	.mi-val {
+		font-size: 26rpx;
+		color: #999999;
+		margin-right: 12rpx;
+	}
+
+	.arrow {
+		font-size: 34rpx;
+		color: #cccccc;
+	}
+
+	.divider {
+		height: 16rpx;
+		background-color: #f7f7f7;
+		margin: 20rpx 0;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+		padding: 12rpx 32rpx 40rpx 32rpx;
+	}
+</style>

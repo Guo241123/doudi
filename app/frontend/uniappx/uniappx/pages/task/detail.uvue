@@ -1,0 +1,352 @@
+<template>
+	<view class="page">
+		<nav-bar title="任务详情" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<!-- 加载中 -->
+			<view v-if="loading" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 加载失败 -->
+			<view v-else-if="failed" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="loadDetail"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<!-- 任务详情 -->
+			<view v-else>
+				<view class="block">
+					<text class="detail-title">{{ title }}</text>
+				</view>
+
+				<view v-if="summary != ''" class="block">
+					<text class="block-title">任务说明</text>
+					<text class="desc">{{ summary }}</text>
+				</view>
+
+				<view class="block">
+					<view class="crow">
+						<text class="crow-k">报酬说明</text>
+						<text class="crow-v">{{ rewardText }}</text>
+					</view>
+					<view class="crow">
+						<text class="crow-k">截止时间</text>
+						<text class="crow-v">{{ deadline }}</text>
+					</view>
+					<view class="crow">
+						<text class="crow-k">发布时间</text>
+						<text class="crow-v">{{ publishTime }}</text>
+					</view>
+				</view>
+
+				<view class="block">
+					<text class="block-title">任务负责人</text>
+					<text class="hint">感兴趣请点击下方按钮联系任务负责人沟通工作细节，平台不参与任务流转。</text>
+				</view>
+
+				<view v-if="attachments.length > 0" class="block">
+					<text class="block-title">附件</text>
+					<view class="attachments">
+						<view class="att-wrap" v-for="(a, i) in attachments" :key="i">
+							<image v-if="a.type == 'IMAGE'" class="att-img" :src="a.url" mode="aspectFill"></image>
+							<video v-else class="att-img" :src="a.url" :controls="true"></video>
+						</view>
+					</view>
+				</view>
+
+				<view class="risk">
+					<text class="risk-b">风险提示</text>
+					<text class="risk-t">{{ riskText }}</text>
+				</view>
+			</view>
+		</scroll-view>
+
+		<view class="actionbar">
+			<view class="btn-dark" :class="contacting ? 'btn-disabled' : ''" @click="onContact">
+				<text class="btn-dark-text">{{ contacting ? '正在打开…' : '联系任务负责人' }}</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 任务详情（原型 11，需求文档 4.3.3）：任务说明 / 报酬 / 时间 / 附件 / 风险提示 / 联系任务负责人
+	// 对接《接口文档》#16 任务详情、#36 发起任务咨询会话
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getTaskDetail } from '../../api/task.uts'
+	import { createConversation } from '../../api/message.uts'
+	import { errorCode, errorMessage } from '../../api/request.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type Attachment = {
+		type : string
+		url : string
+	}
+
+	// 后端未下发 riskNotice 时的兜底文案（取自需求文档 4.3.3）
+	const DEFAULT_RISK = '平台仅展示任务信息，请自行甄别真实性，切勿提前支付任何费用。'
+
+	const taskId = ref(0)
+	const title = ref('')
+	const summary = ref('')
+	const rewardText = ref('')
+	const publishTime = ref('')
+	const deadline = ref('')
+	const riskText = ref(DEFAULT_RISK)
+	const attachments = ref<Attachment[]>([])
+
+	const loading = ref(true)
+	const failed = ref(false)
+	const contacting = ref(false)
+
+	function loadDetail() {
+		if (taskId.value <= 0) {
+			loading.value = false
+			failed.value = true
+			return
+		}
+		loading.value = true
+		failed.value = false
+
+		getTaskDetail(taskId.value).then((data) => {
+			loading.value = false
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				failed.value = true
+				return
+			}
+			title.value = obj.getString('title') ?? ''
+			summary.value = obj.getString('summary') ?? ''
+			rewardText.value = obj.getString('rewardText') ?? ''
+			publishTime.value = obj.getString('publishTime') ?? ''
+			deadline.value = obj.getString('deadline') ?? ''
+
+			const rn = obj.getString('riskNotice') ?? ''
+			riskText.value = rn == '' ? DEFAULT_RISK : rn
+
+			const arr = obj.getArray<UTSJSONObject>('attachments')
+			const list : Attachment[] = []
+			if (arr != null) {
+				for (let i = 0; i < arr.length; i++) {
+					const a = arr[i]
+					const url = a.getString('url') ?? ''
+					if (url != '') {
+						const at : Attachment = { type: a.getString('type') ?? 'IMAGE', url: url }
+						list.push(at)
+					}
+				}
+			}
+			attachments.value = list
+		}).catch((e) => {
+			loading.value = false
+			failed.value = true
+			if (errorCode(e) == 40401) {
+				uni.showToast({ title: '任务不存在或已下架', icon: 'none' })
+			}
+		})
+	}
+
+	onLoad((query) => {
+		const idv = query['id']
+		if (idv != null) {
+			taskId.value = parseInt(idv as string, 10)
+		}
+		loadDetail()
+	})
+
+
+	// 联系任务负责人 = 打开「任务咨询」会话（#36，自动关联本任务）
+	function onContact() {
+		if (!isLogin()) {
+			uni.showModal({
+				title: '提示',
+				content: '联系任务负责人需要先登录',
+				confirmText: '去登录',
+				cancelText: '取消',
+				success: (r) => {
+					if (r.confirm) {
+						uni.navigateTo({ url: '/pages/login/index' })
+					}
+				}
+			})
+			return
+		}
+		if (contacting.value) {
+			return
+		}
+		contacting.value = true
+
+		createConversation('TASK_CONSULT', 0, taskId.value).then((data) => {
+			contacting.value = false
+			const obj = data as UTSJSONObject | null
+			const cid = obj == null ? 0 : (obj.getNumber('conversationId') ?? 0)
+			if (cid <= 0) {
+				uni.showToast({ title: '会话创建失败，请重试', icon: 'none' })
+				return
+			}
+			uni.navigateTo({ url: '/pages/message/chat?conversationId=' + cid + '&type=TASK_CONSULT&taskId=' + taskId.value + '&title=' + encodeURIComponent(title.value) })
+		}).catch((e) => {
+			contacting.value = false
+			if (errorCode(e) == 40101) {
+				uni.navigateTo({ url: '/pages/login/index' })
+				return
+			}
+			uni.showToast({ title: errorMessage(e), icon: 'none' })
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 180rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.block {
+		padding: 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.detail-title {
+		font-size: 36rpx;
+		font-weight: 600;
+		line-height: 50rpx;
+		color: #111111;
+	}
+
+	.block-title {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #111111;
+		margin-bottom: 20rpx;
+	}
+
+	.desc {
+		font-size: 28rpx;
+		line-height: 48rpx;
+		color: #444444;
+	}
+
+	.crow {
+		flex-direction: row;
+		align-items: center;
+		padding: 16rpx 0;
+	}
+
+	.crow-k {
+		width: 140rpx;
+		font-size: 28rpx;
+		color: #999999;
+	}
+
+	.crow-v {
+		flex: 1;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #222222;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+	}
+
+	.attachments {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.att-wrap {
+		margin-right: 16rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.att-img {
+		width: 176rpx;
+		height: 176rpx;
+		border-radius: 16rpx;
+		background-color: #f2f2f2;
+	}
+
+	.risk {
+		margin: 28rpx 32rpx 40rpx 32rpx;
+		padding: 24rpx 28rpx;
+		background-color: #fafafa;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #e2e2e2;
+		border-radius: 20rpx;
+	}
+
+	.risk-b {
+		font-size: 26rpx;
+		font-weight: 700;
+		color: #333333;
+	}
+
+	.risk-t {
+		font-size: 25rpx;
+		line-height: 42rpx;
+		color: #777777;
+		margin-top: 8rpx;
+	}
+
+	.actionbar {
+		padding: 20rpx 32rpx;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: #ededed;
+		background-color: #ffffff;
+	}
+
+	.btn-dark {
+		background-color: #111111;
+		border-radius: 18rpx;
+		padding: 28rpx;
+		align-items: center;
+	}
+
+	.btn-disabled {
+		opacity: 0.6;
+	}
+
+	.btn-dark-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+</style>

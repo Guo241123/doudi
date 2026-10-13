@@ -1,0 +1,492 @@
+<template>
+	<view class="page">
+		<nav-bar title="账号安全" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<!-- 更换手机号：#12，验证码发到新手机号（scene=CHANGE_MOBILE） -->
+			<text class="sec-title">更换手机号</text>
+			<view class="field">
+				<input class="field-input" type="number" placeholder="请输入新手机号" placeholder-class="ph" v-model="newMobile" :maxlength="11" />
+			</view>
+			<view class="field">
+				<input class="field-input" type="number" placeholder="请输入短信验证码" placeholder-class="ph" v-model="mobileSmsCode" :maxlength="6" />
+				<text class="mini-btn" :class="countdown > 0 ? 'mini-btn-disabled' : ''" @click="onSendMobileSms">{{ smsBtnText }}</text>
+			</view>
+			<view class="btn-dark" :class="changingMobile ? 'btn-disabled' : ''" @click="onChangeMobile">
+				<text class="btn-dark-text">{{ changingMobile ? '提交中…' : '确认更换' }}</text>
+			</view>
+			<text class="tip">更换成功后当前登录状态将失效，需要用新手机号重新登录。</text>
+
+			<view class="sec-gap"></view>
+
+			<!-- 修改密码：#13，旧密码 / 短信验证码 二选一（需求 4.1.3） -->
+			<text class="sec-title">修改密码</text>
+			<view class="seg">
+				<text class="seg-item" :class="pwdMethod == 'old' ? 'seg-on' : ''" @click="switchPwdMethod('old')">旧密码验证</text>
+				<text class="seg-item" :class="pwdMethod == 'sms' ? 'seg-on' : ''" @click="switchPwdMethod('sms')">短信验证码</text>
+			</view>
+
+			<template v-if="pwdMethod == 'old'">
+				<view class="field">
+					<input class="field-input" :password="true" placeholder="请输入当前密码" placeholder-class="ph" v-model="oldPassword" />
+				</view>
+			</template>
+			<template v-else>
+				<view class="field">
+					<input class="field-input" type="number" placeholder="请输入短信验证码" placeholder-class="ph" v-model="pwdSmsCode" :maxlength="6" />
+					<text class="mini-btn" :class="pwdCountdown > 0 ? 'mini-btn-disabled' : ''" @click="onSendPwdSms">{{ pwdSmsBtnText }}</text>
+				</view>
+				<text class="sub-tip">验证码将发送至绑定手机号 {{ maskedMobile }}</text>
+			</template>
+
+			<view class="field">
+				<input class="field-input" :password="true" placeholder="请输入新密码（8～20 位，含字母与数字）" placeholder-class="ph" v-model="newPassword" />
+			</view>
+			<view class="field">
+				<input class="field-input" :password="true" placeholder="请再次输入新密码" placeholder-class="ph" v-model="confirmPassword" />
+			</view>
+			<view class="btn-dark" :class="changingPwd ? 'btn-disabled' : ''" @click="onChangePassword">
+				<text class="btn-dark-text">{{ changingPwd ? '提交中…' : '确认修改' }}</text>
+			</view>
+			<text class="tip">修改成功后当前登录状态将失效，需要重新登录。</text>
+		</scroll-view>
+
+		<captcha-popup v-if="showCaptcha" :image-src="captchaImg" :loading="captchaLoading"
+			@confirm="onCaptchaConfirm" @refresh="loadCaptcha" @close="onCaptchaClose"></captcha-popup>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 账号安全（需求 4.1.3）：更换手机号 #12、修改密码 #13（旧密码 / 短信验证码二选一）
+	// 短信与图形验证码复用 #0 图形验证码 / #1 发送短信（换手机号 scene=CHANGE_MOBILE，改密码 scene=RESET）
+	// 改密码的短信发到「绑定手机号」：#10 只返回脱敏号，故用登录/注册时本地缓存的完整号
+	import { onUnload } from '@dcloudio/uni-app'
+	import { getCaptcha, sendSms, changeMobile, changePassword } from '../../api/auth.uts'
+	import { errorCode, errorMessage } from '../../api/request.uts'
+	import { clearToken, getMobile } from '../../utils/token.uts'
+	import { isMobile, isSmsCode, pwdLengthOk, pwdMixOk } from '../../utils/validate.uts'
+
+	// ===== 更换手机号 =====
+	const newMobile = ref('')
+	const mobileSmsCode = ref('')
+	const changingMobile = ref(false)
+	const countdown = ref(0)
+	let timer : number = -1
+
+	// ===== 修改密码 =====
+	const pwdMethod = ref('old') // old / sms
+	const boundMobile = ref(getMobile())
+	const oldPassword = ref('')
+	const pwdSmsCode = ref('')
+	const newPassword = ref('')
+	const confirmPassword = ref('')
+	const changingPwd = ref(false)
+	const pwdCountdown = ref(0)
+	let pwdTimer : number = -1
+
+	// 图形验证码弹窗
+	const showCaptcha = ref(false)
+	const captchaImg = ref('')
+	const captchaLoading = ref(false)
+	const captchaId = ref('')
+	const captchaFor = ref('mobile') // mobile / pwd
+
+	const smsBtnText = computed<string>(() : string => {
+		if (countdown.value > 0) {
+			return countdown.value.toString() + 's'
+		}
+		return '获取验证码'
+	})
+
+	const pwdSmsBtnText = computed<string>(() : string => {
+		if (pwdCountdown.value > 0) {
+			return pwdCountdown.value.toString() + 's'
+		}
+		return '获取验证码'
+	})
+
+	const maskedMobile = computed<string>(() : string => {
+		const m = boundMobile.value
+		if (m.length != 11) {
+			return m == '' ? '（未获取到）' : m
+		}
+		return m.substring(0, 3) + '****' + m.substring(7)
+	})
+
+	function stopCountdown() {
+		if (timer != -1) {
+			clearInterval(timer)
+			timer = -1
+		}
+	}
+
+	function stopPwdCountdown() {
+		if (pwdTimer != -1) {
+			clearInterval(pwdTimer)
+			pwdTimer = -1
+		}
+	}
+
+	onUnload(() => {
+		stopCountdown()
+		stopPwdCountdown()
+	})
+
+
+	function startCountdown() {
+		stopCountdown()
+		countdown.value = 60
+		timer = setInterval(() => {
+			if (countdown.value <= 1) {
+				countdown.value = 0
+				stopCountdown()
+			} else {
+				countdown.value = countdown.value - 1
+			}
+		}, 1000)
+	}
+
+
+	function startPwdCountdown() {
+		stopPwdCountdown()
+		pwdCountdown.value = 60
+		pwdTimer = setInterval(() => {
+			if (pwdCountdown.value <= 1) {
+				pwdCountdown.value = 0
+				stopPwdCountdown()
+			} else {
+				pwdCountdown.value = pwdCountdown.value - 1
+			}
+		}, 1000)
+	}
+
+	function loadCaptcha() {
+		captchaLoading.value = true
+		getCaptcha().then((data) => {
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				captchaLoading.value = false
+				uni.showToast({ title: '验证码获取失败', icon: 'none' })
+				return
+			}
+			captchaId.value = obj.getString('captchaId') ?? ''
+			const b64 = obj.getString('imageBase64') ?? ''
+			if (b64 == '') {
+				captchaImg.value = ''
+			} else if (b64.startsWith('data:')) {
+				captchaImg.value = b64
+			} else {
+				captchaImg.value = 'data:image/png;base64,' + b64
+			}
+			captchaLoading.value = false
+		}).catch((_) => {
+			captchaLoading.value = false
+			uni.showToast({ title: '验证码获取失败，请重试', icon: 'none' })
+		})
+	}
+
+	// ===== 图形验证码 =====
+	function openCaptcha(forWhat : string) {
+		captchaFor.value = forWhat
+		captchaImg.value = ''
+		captchaId.value = ''
+		showCaptcha.value = true
+		loadCaptcha()
+	}
+
+
+	function onCaptchaClose() {
+		showCaptcha.value = false
+	}
+
+	function showSmsSent(data : any) {
+		const obj = data as UTSJSONObject | null
+		const left = obj == null ? -1 : (obj.getNumber('leftToday') ?? -1)
+		if (left >= 0) {
+			uni.showToast({ title: '验证码已发送，今日还可发送 ' + left.toString() + ' 次', icon: 'none' })
+		} else {
+			uni.showToast({ title: '验证码已发送', icon: 'none' })
+		}
+	}
+
+	function handleSmsError(e : any | null) {
+		const code = errorCode(e)
+		if (code == 40003) {
+			uni.showToast({ title: '图形验证码错误，请重新输入', icon: 'none' })
+			openCaptcha(captchaFor.value)
+		} else if (code == 42901) {
+			uni.showToast({ title: '发送过于频繁，请稍后再试', icon: 'none' })
+		} else if (code == 40901 || code == 40401) {
+			uni.showToast({ title: '该手机号不可用', icon: 'none' })
+		} else if (code == 40301) {
+			uni.showToast({ title: '账号不可用', icon: 'none' })
+		} else {
+			uni.showModal({ title: '无法发送验证码', content: errorMessage(e), showCancel: false })
+		}
+	}
+
+	function doSendMobileSms(cid : string, ccode : string) {
+		if (cid == '') {
+			uni.showToast({ title: '验证码已失效，请重新获取', icon: 'none' })
+			return
+		}
+		uni.showLoading({ title: '发送中', mask: true })
+		sendSms(newMobile.value, 'CHANGE_MOBILE', cid, ccode).then((data) => {
+			uni.hideLoading()
+			showSmsSent(data)
+			startCountdown()
+		}).catch((e) => {
+			uni.hideLoading()
+			handleSmsError(e)
+		})
+	}
+
+	function doSendPwdSms(cid : string, ccode : string) {
+		if (cid == '') {
+			uni.showToast({ title: '验证码已失效，请重新获取', icon: 'none' })
+			return
+		}
+		uni.showLoading({ title: '发送中', mask: true })
+		sendSms(boundMobile.value, 'RESET', cid, ccode).then((data) => {
+			uni.hideLoading()
+			showSmsSent(data)
+			startPwdCountdown()
+		}).catch((e) => {
+			uni.hideLoading()
+			handleSmsError(e)
+		})
+	}
+
+	function onCaptchaConfirm(code : string) {
+		showCaptcha.value = false
+		if (captchaFor.value == 'pwd') {
+			doSendPwdSms(captchaId.value, code)
+		} else {
+			doSendMobileSms(captchaId.value, code)
+		}
+	}
+
+	// ===== 更换手机号：发送短信（#1，scene=CHANGE_MOBILE，发到新手机号）=====
+	function onSendMobileSms() {
+		if (countdown.value > 0) {
+			return
+		}
+		if (!isMobile(newMobile.value)) {
+			uni.showToast({ title: '请输入正确的新手机号', icon: 'none' })
+			return
+		}
+		openCaptcha('mobile')
+	}
+
+
+	// ===== 修改密码：发送短信（#1，scene=RESET，发到当前绑定手机号）=====
+	function onSendPwdSms() {
+		if (pwdCountdown.value > 0) {
+			return
+		}
+		if (!isMobile(boundMobile.value)) {
+			uni.showToast({ title: '未获取到绑定手机号，请稍后重试', icon: 'none' })
+			return
+		}
+		openCaptcha('pwd')
+	}
+
+
+
+
+	function switchPwdMethod(m : string) {
+		pwdMethod.value = m
+	}
+
+	// ===== 更换手机号（#12）=====
+	// 高危操作成功：所有 token 失效，清本地登录态并回登录页
+	function afterSecurityChange(tip : string) {
+		uni.showModal({
+			title: '提示',
+			content: tip,
+			showCancel: false,
+			success: (_) => {
+				clearToken()
+				uni.reLaunch({ url: '/pages/login/index' })
+			}
+		})
+	}
+
+	function onChangeMobile() {
+		if (changingMobile.value) {
+			return
+		}
+		if (!isMobile(newMobile.value)) {
+			uni.showToast({ title: '请输入正确的新手机号', icon: 'none' })
+			return
+		}
+		if (!isSmsCode(mobileSmsCode.value)) {
+			uni.showToast({ title: '请输入 6 位短信验证码', icon: 'none' })
+			return
+		}
+		changingMobile.value = true
+		changeMobile(newMobile.value, mobileSmsCode.value).then((_) => {
+			changingMobile.value = false
+			afterSecurityChange('手机号更换成功，请用新手机号重新登录')
+		}).catch((e) => {
+			changingMobile.value = false
+			uni.showToast({ title: errorMessage(e), icon: 'none' })
+		})
+	}
+
+	// ===== 修改密码（#13，旧密码或短信验证码二选一）=====
+	function onChangePassword() {
+		if (changingPwd.value) {
+			return
+		}
+		if (pwdMethod.value == 'old') {
+			if (oldPassword.value == '') {
+				uni.showToast({ title: '请输入当前密码', icon: 'none' })
+				return
+			}
+		} else {
+			if (!isSmsCode(pwdSmsCode.value)) {
+				uni.showToast({ title: '请输入 6 位短信验证码', icon: 'none' })
+				return
+			}
+		}
+		if (!pwdLengthOk(newPassword.value)) {
+			uni.showToast({ title: '新密码需 8～20 位', icon: 'none' })
+			return
+		}
+		if (!pwdMixOk(newPassword.value)) {
+			uni.showToast({ title: '新密码需同时包含字母与数字', icon: 'none' })
+			return
+		}
+		if (newPassword.value != confirmPassword.value) {
+			uni.showToast({ title: '两次输入的新密码不一致', icon: 'none' })
+			return
+		}
+
+		const oldPwd = pwdMethod.value == 'old' ? oldPassword.value : ''
+		const smsCode = pwdMethod.value == 'sms' ? pwdSmsCode.value : ''
+
+		changingPwd.value = true
+		changePassword(oldPwd, smsCode, newPassword.value, confirmPassword.value).then((_) => {
+			changingPwd.value = false
+			afterSecurityChange('密码修改成功，请重新登录')
+		}).catch((e) => {
+			changingPwd.value = false
+			uni.showToast({ title: errorMessage(e), icon: 'none' })
+		})
+	}
+
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.sec-title {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #999999;
+		padding: 36rpx 32rpx 8rpx 32rpx;
+	}
+
+	.sec-gap {
+		height: 20rpx;
+		background-color: #f7f7f7;
+		margin-top: 40rpx;
+	}
+
+	.seg {
+		flex-direction: row;
+		margin: 12rpx 32rpx 8rpx 32rpx;
+	}
+
+	.seg-item {
+		font-size: 26rpx;
+		color: #666666;
+		padding: 12rpx 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #ededed;
+		border-radius: 12rpx;
+		margin-right: 20rpx;
+	}
+
+	.seg-on {
+		color: #ffffff;
+		background-color: #111111;
+		border-color: #111111;
+	}
+
+	.field {
+		flex-direction: row;
+		align-items: center;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+		padding: 30rpx 32rpx;
+	}
+
+	.field-input {
+		flex: 1;
+		font-size: 30rpx;
+		color: #111111;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 30rpx;
+	}
+
+	.sub-tip {
+		font-size: 23rpx;
+		color: #aaaaaa;
+		padding: 14rpx 32rpx 0 32rpx;
+	}
+
+	.mini-btn {
+		font-size: 24rpx;
+		color: #111111;
+		background-color: #ffffff;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 12rpx;
+		padding: 10rpx 20rpx;
+	}
+
+	.mini-btn-disabled {
+		color: #c4c4c4;
+		border-color: #ececec;
+	}
+
+	.btn-dark {
+		background-color: #111111;
+		border-radius: 20rpx;
+		padding: 30rpx;
+		align-items: center;
+		margin: 40rpx 32rpx 0 32rpx;
+	}
+
+	.btn-disabled {
+		opacity: 0.6;
+	}
+
+	.btn-dark-text {
+		font-size: 31rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.tip {
+		font-size: 23rpx;
+		line-height: 36rpx;
+		color: #aaaaaa;
+		padding: 18rpx 32rpx 0 32rpx;
+	}
+</style>

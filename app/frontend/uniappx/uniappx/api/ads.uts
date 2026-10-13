@@ -1,0 +1,14 @@
+// 广告与埋点接口（对应《接口文档》2.9）
+
+import { request } from './request.uts'
+
+// #45 广告曝光 / 点击上报（失败静默）
+export function reportAd(adId : number, slot : string, action : string) : Promise<any> {
+	return request({ url: '/ads/report', method: 'POST', auth: false, silent: true, data: { adId: adId, slot: slot, action: action } })
+}
+
+// #46 埋点批量上报（MVP 最小 5 事件，失败静默）
+// 注意：UTS 泛型不变型，调用方传 UTSJSONObject[]，这里必须声明成 UTSJSONObject[] 而不是 any[]
+export function reportEvents(events : UTSJSONObject[]) : Promise<any> {
+	return request({ url: '/analytics/events', method: 'POST', auth: false, silent: true, data: { events: events } })
+}

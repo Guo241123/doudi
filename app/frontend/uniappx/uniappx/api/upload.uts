@@ -1,0 +1,62 @@
+// OSS 直传（对应《接口文档》2.5 #26）
+// 流程：#26 取直传签名 → 读取本地文件为 ArrayBuffer → PUT 到 OSS → 返回 fileKey
+// 说明：uni-app x 的 uni.uploadFile 为 multipart 表单，OSS 预签名要求原始 PUT，故用 uni.request 发送二进制体
+
+import { getUploadToken } from './auth.uts'
+
+function makeErr(message : string) : UTSJSONObject {
+	const o = {} as UTSJSONObject
+	o['code'] = -1
+	o['message'] = message
+	return o
+}
+
+// 上传本地临时文件，成功 resolve fileKey
+// fileType: IMAGE / VIDEO；biz: AVATAR / ITEM / POST
+export function uploadLocalFile(filePath : string, fileType : string, biz : string) : Promise<string> {
+	return new Promise<string>((resolve, reject) => {
+		getUploadToken(fileType, biz).then((data) => {
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				reject(makeErr('获取上传签名失败'))
+				return
+			}
+			const uploadUrl = obj.getString('uploadUrl') ?? ''
+			const fileKey = obj.getString('fileKey') ?? ''
+			const headers = obj.getJSON('headers')
+			if (uploadUrl == '' || fileKey == '') {
+				reject(makeErr('上传签名数据不完整'))
+				return
+			}
+
+			uni.getFileSystemManager().readFile({
+				filePath: filePath,
+				success: (res) => {
+					const buf = res.data as ArrayBuffer
+					uni.request({
+						url: uploadUrl,
+						method: 'PUT',
+						header: headers,
+						data: buf,
+						success: (r) => {
+							const sc = r.statusCode
+							if (sc >= 200 && sc < 300) {
+								resolve(fileKey)
+							} else {
+								reject(makeErr('文件上传失败（' + sc + '）'))
+							}
+						},
+						fail: (_) => {
+							reject(makeErr('文件上传失败'))
+						}
+					})
+				},
+				fail: (_) => {
+					reject(makeErr('读取本地文件失败'))
+				}
+			})
+		}).catch((_) => {
+			reject(makeErr('获取上传签名失败'))
+		})
+	})
+}

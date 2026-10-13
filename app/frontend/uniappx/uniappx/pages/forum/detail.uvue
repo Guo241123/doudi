@@ -1,0 +1,938 @@
+<template>
+	<view class="page">
+		<nav-bar title="帖子详情" :show-back="true" right-text="···" @right="onMore"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<!-- 首屏加载中 -->
+			<view v-if="loading" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 加载失败 -->
+			<view v-else-if="failed" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="loadDetail"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<template v-else>
+				<!-- 帖子主体 -->
+				<view class="post" :class="announce ? 'post-announce' : ''">
+					<view class="post-head">
+						<image v-if="avatar != ''" class="avatar-img" :src="avatar" mode="aspectFill"></image>
+						<view v-else class="avatar" :class="announce ? 'avatar-announce' : ''"></view>
+						<view class="ph-body">
+							<view class="ph-row">
+								<text class="nick" :class="announce ? 'nick-announce' : ''">{{ nickname }}</text>
+								<text v-if="announce" class="badge">公告</text>
+							</view>
+							<text class="time" :class="announce ? 'time-announce' : ''">{{ time }}</text>
+						</view>
+					</view>
+
+					<text class="content" :class="announce ? 'text-announce' : ''">{{ content }}</text>
+
+					<video v-if="videoUrl != ''" class="video" :src="videoUrl" :controls="true"></video>
+					<view v-else-if="images.length > 0" class="gallery">
+						<swiper class="swiper" @change="onSwiper">
+							<swiper-item v-for="(img, i) in images" :key="i">
+								<image class="gallery-img" :src="img" mode="aspectFill"></image>
+							</swiper-item>
+						</swiper>
+						<view class="gallery-count"><text class="gallery-count-text">{{ current + 1 }} / {{ images.length }}</text></view>
+					</view>
+
+					<!-- 互动：仅 SVG 图标（点赞 / 评论 / 收藏 / 分享 / 举报） -->
+					<view class="acts" :class="announce ? 'acts-announce' : ''">
+						<view class="act" @click="onLike">
+							<svg-icon :name="announce ? 'heart-white' : (liked ? 'heart-filled' : 'heart')" :size="34"></svg-icon>
+							<text class="act-num" :class="announce ? 'act-num-announce' : ''">{{ likeCount }}</text>
+						</view>
+						<view class="act" @click="onFocusComment">
+							<svg-icon :name="announce ? 'comment-white' : 'comment'" :size="34"></svg-icon>
+							<text class="act-num" :class="announce ? 'act-num-announce' : ''">{{ commentCount }}</text>
+						</view>
+						<view class="act" @click="onFav">
+							<svg-icon :name="announce ? (favorited ? 'bookmark-white-filled' : 'bookmark-white') : (favorited ? 'bookmark-filled' : 'bookmark')" :size="34"></svg-icon>
+						</view>
+						<view class="act" @click="onShare">
+							<svg-icon :name="announce ? 'share-white' : 'share'" :size="34"></svg-icon>
+						</view>
+						<view class="act" @click="onReportPost">
+							<svg-icon :name="announce ? 'report-white' : 'report'" :size="34"></svg-icon>
+						</view>
+					</view>
+				</view>
+
+				<!-- 评论列表（热评前置，见 #32） -->
+				<view class="c-head-bar">
+					<text class="c-title">评论 {{ commentCount }}</text>
+				</view>
+
+				<view v-if="commentsLoading && comments.length == 0" class="state state-sm">
+					<text class="state-text">评论加载中…</text>
+				</view>
+				<view v-else-if="commentsFailed && comments.length == 0" class="state state-sm">
+					<text class="state-text">评论加载失败</text>
+					<view class="retry" @click="reloadComments"><text class="retry-text">重新加载</text></view>
+				</view>
+				<view v-else-if="comments.length == 0" class="state state-sm">
+					<text class="state-text">还没有评论，快来抢沙发</text>
+				</view>
+
+				<view v-else>
+					<view class="comment" v-for="(c, i) in comments" :key="c.id">
+						<image v-if="c.avatar != ''" class="c-avatar-img" :src="c.avatar" mode="aspectFill"></image>
+						<view v-else class="c-avatar"></view>
+						<view class="c-body">
+							<view class="c-head">
+								<text class="c-nick">{{ c.nickname }}</text>
+								<text v-if="c.hot" class="c-hot">热评</text>
+							</view>
+							<text class="c-text"><text v-if="c.replyNickname != ''" class="c-reply">回复 @{{ c.replyNickname }}：</text>{{ c.content }}</text>
+							<view class="c-foot">
+								<text class="c-time">{{ c.time }}</text>
+								<text class="c-act-text" @click="onReply(c)">回复</text>
+								<text class="c-act-text" @click="onReportComment(c)">举报</text>
+								<view class="c-like" @click="onCommentLike(i)">
+									<svg-icon :name="c.liked ? 'heart-filled' : 'heart'" :size="26"></svg-icon>
+									<text class="c-like-num">{{ c.likeCount }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+
+					<view class="foot">
+						<text v-if="commentsLoading" class="foot-text">加载中…</text>
+						<text v-else-if="!commentHasMore" class="foot-text">没有更多了</text>
+						<text v-else class="foot-text">上拉加载更多</text>
+					</view>
+				</view>
+			</template>
+		</scroll-view>
+
+		<!-- 评论输入栏 -->
+		<view v-if="!loading && !failed" class="inputbar">
+			<view v-if="replyToCommentId > 0" class="reply-chip">
+				<text class="reply-chip-text">回复 @{{ replyNickname }}</text>
+				<text class="reply-chip-x" @click="cancelReply">×</text>
+			</view>
+			<view class="input-row">
+				<input
+					class="inp"
+					:focus="focusInput"
+					:placeholder="replyToCommentId > 0 ? ('回复 @' + replyNickname) : '写评论…'"
+					placeholder-class="ph"
+					@blur="onBlurInput"
+					v-model="draft" />
+				<text class="send" :class="sending ? 'send-off' : ''" @click="onSend">发送</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 帖子详情页（需求 4.4.2，原型 13）
+	// 对接《接口文档》#29 帖子详情、#30 帖子点赞、#31 帖子收藏、#32 评论列表、#33 发表评论/回复、#34 评论点赞、#35 删除自己的帖子
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getPostDetail, likePost, unlikePost, favoritePost, unfavoritePost, getComments, addComment, likeComment, unlikeComment, deletePost } from '../../api/forum.uts'
+	import { blacklistUser } from '../../api/report.uts'
+	import { errorMessage } from '../../api/request.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type Comment = {
+		id : number
+		nickname : string
+		avatar : string
+		content : string
+		replyNickname : string
+		likeCount : number
+		liked : boolean
+		hot : boolean
+		time : string
+	}
+
+	const PAGE_SIZE = 20
+
+	const id = ref(0)
+	const loading = ref(true)
+	const failed = ref(false)
+
+	const nickname = ref('')
+	const avatar = ref('')
+	const authorUserId = ref(0)
+	const time = ref('')
+	const content = ref('')
+	const images = ref<string[]>([])
+	const videoUrl = ref('')
+	const current = ref(0)
+	const liked = ref(false)
+	const likeCount = ref(0)
+	const commentCount = ref(0)
+	const favorited = ref(false)
+	const announce = ref(false)
+	const isMine = ref(false)
+
+	const comments = ref<Comment[]>([])
+	const commentCursor = ref(0)
+	const commentHasMore = ref(true)
+	const commentsLoading = ref(false)
+	const commentsFailed = ref(false)
+
+	const draft = ref('')
+	const replyToCommentId = ref(0)
+	const replyNickname = ref('')
+	const sending = ref(false)
+	const focusInput = ref(false)
+
+	function loadDetail() {
+		if (id.value <= 0) {
+			loading.value = false
+			failed.value = true
+			return
+		}
+		loading.value = true
+		failed.value = false
+		current.value = 0
+
+		getPostDetail(id.value).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			const author = o.getJSON('author')
+			if (author != null) {
+				nickname.value = author.getString('nickname') ?? ''
+				avatar.value = author.getString('avatar') ?? ''
+				authorUserId.value = author.getNumber('userId') ?? 0
+			}
+			time.value = o.getString('publishTime') ?? ''
+			content.value = o.getString('content') ?? ''
+			likeCount.value = o.getNumber('likeCount') ?? 0
+			commentCount.value = o.getNumber('commentCount') ?? 0
+			liked.value = o.getBoolean('liked') ?? false
+			favorited.value = o.getBoolean('favorited') ?? false
+			announce.value = o.getBoolean('isAnnouncement') ?? false
+			isMine.value = o.getBoolean('isMine') ?? false
+
+			const media = o.getArray<UTSJSONObject>('media')
+			const imgs : string[] = []
+			let vurl = ''
+			if (media != null) {
+				for (let i = 0; i < media.length; i++) {
+					const m = media[i]
+					const type = m.getString('type') ?? 'IMAGE'
+					const url = m.getString('url') ?? ''
+					if (url == '') {
+						continue
+					}
+					if (type == 'VIDEO') {
+						if (vurl == '') {
+							vurl = url
+						}
+					} else {
+						imgs.push(url)
+					}
+				}
+			}
+			images.value = imgs
+			videoUrl.value = vurl
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	function loadComments(reset : boolean) {
+		if (commentsLoading.value) {
+			return
+		}
+		if (reset) {
+			commentCursor.value = 0
+			commentHasMore.value = true
+			commentsFailed.value = false
+			comments.value = []
+		}
+		if (!commentHasMore.value) {
+			return
+		}
+
+		commentsLoading.value = true
+		getComments(id.value, commentCursor.value, PAGE_SIZE).then((data) => {
+			commentsLoading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				commentsFailed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					const c = list[i]
+					const item : Comment = {
+						id: c.getNumber('id') ?? 0,
+						nickname: '',
+						avatar: '',
+						content: c.getString('content') ?? '',
+						replyNickname: '',
+						likeCount: c.getNumber('likeCount') ?? 0,
+						liked: c.getBoolean('liked') ?? false,
+						hot: c.getBoolean('hot') ?? false,
+						time: c.getString('createTime') ?? ''
+					}
+					const a = c.getJSON('author')
+					if (a != null) {
+						item.nickname = a.getString('nickname') ?? ''
+						item.avatar = a.getString('avatar') ?? ''
+					}
+					const rt = c.getJSON('replyTo')
+					if (rt != null) {
+						item.replyNickname = rt.getString('nickname') ?? ''
+					}
+					comments.value.push(item)
+				}
+			}
+			commentCursor.value = o.getNumber('nextCursor') ?? 0
+			commentHasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			commentsLoading.value = false
+			commentsFailed.value = true
+		})
+	}
+
+	onLoad((query) => {
+		const idv = query['id']
+		if (idv != null) {
+			id.value = parseInt(idv as string, 10)
+		}
+		const fv = query['focus']
+		if (fv != null) {
+			focusInput.value = true
+		}
+		loadDetail()
+		loadComments(true)
+	})
+
+	function reloadComments() {
+		loadComments(true)
+	}
+
+	function onScrollLower() {
+		if (!commentsLoading.value && commentHasMore.value) {
+			loadComments(false)
+		}
+	}
+
+	function onSwiper(e : UniSwiperChangeEvent) {
+		current.value = e.detail.current
+	}
+
+	function goLogin() {
+		uni.showModal({
+			title: '提示',
+			content: '该操作需要先登录',
+			confirmText: '去登录',
+			cancelText: '取消',
+			success: (r) => {
+				if (r.confirm) {
+					uni.navigateTo({ url: '/pages/login/index' })
+				}
+			}
+		})
+	}
+
+	// 帖子点赞 / 取消（#30 幂等，返回 { likeCount, liked }）
+	function onLike() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		const apply = (data : any) => {
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				return
+			}
+			likeCount.value = o.getNumber('likeCount') ?? likeCount.value
+			liked.value = o.getBoolean('liked') ?? liked.value
+		}
+		if (liked.value) {
+			unlikePost(id.value).then(apply).catch((_) => {
+			})
+		} else {
+			likePost(id.value).then(apply).catch((_) => {
+			})
+		}
+	}
+
+	// 帖子收藏 / 取消（#31，详情页入口）
+	function onFav() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		if (favorited.value) {
+			unfavoritePost(id.value).then((_) => {
+				favorited.value = false
+				uni.showToast({ title: '已取消收藏', icon: 'none' })
+			}).catch((_) => {
+			})
+		} else {
+			favoritePost(id.value).then((_) => {
+				favorited.value = true
+				uni.showToast({ title: '已收藏', icon: 'none' })
+			}).catch((_) => {
+			})
+		}
+	}
+
+	// 分享：uni-app x 无 uni.shareWithSystem 系统分享面板，MVP 用剪贴板复制分享内容
+	function onShare() {
+		uni.showActionSheet({
+			itemList: ['复制链接', '复制内容'],
+			success: (res) => {
+				const shareUrl = 'shequ://forum/post/' + id.value
+				const text = content.value + '\n' + shareUrl
+				const value = res.tapIndex == 0 ? shareUrl : text
+				uni.setClipboardData({
+					data: value,
+					success: (_) => {
+						uni.showToast({ title: '已复制，可粘贴分享', icon: 'none' })
+					}
+				})
+			}
+		})
+	}
+
+	function onFocusComment() {
+		focusInput.value = true
+	}
+
+	function onBlurInput() {
+		focusInput.value = false
+	}
+
+	function onReply(c : Comment) {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		replyToCommentId.value = c.id
+		replyNickname.value = c.nickname
+		focusInput.value = true
+	}
+
+	function cancelReply() {
+		replyToCommentId.value = 0
+		replyNickname.value = ''
+	}
+
+	// 评论点赞 / 取消（#34 幂等）
+	function onCommentLike(index : number) {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		const c = comments.value[index]
+		if (c.liked) {
+			unlikeComment(c.id).then((_) => {
+				c.liked = false
+				if (c.likeCount > 0) {
+					c.likeCount = c.likeCount - 1
+				}
+			}).catch((_) => {
+			})
+		} else {
+			likeComment(c.id).then((_) => {
+				c.liked = true
+				c.likeCount = c.likeCount + 1
+			}).catch((_) => {
+			})
+		}
+	}
+
+	// 发表评论 / 回复（#33）
+	function onSend() {
+		if (sending.value) {
+			return
+		}
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		if (draft.value == '') {
+			uni.showToast({ title: '请输入评论内容', icon: 'none' })
+			return
+		}
+		sending.value = true
+		addComment(id.value, draft.value, replyToCommentId.value).then((_) => {
+			sending.value = false
+			draft.value = ''
+			replyToCommentId.value = 0
+			replyNickname.value = ''
+			commentCount.value = commentCount.value + 1
+			uni.showToast({ title: '评论已发布', icon: 'none' })
+			loadComments(true)
+		}).catch((_) => {
+			sending.value = false
+		})
+	}
+
+	function onReportPost() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.navigateTo({ url: '/pages/forum/report?targetType=POST&targetId=' + id.value })
+	}
+
+	function onReportComment(c : Comment) {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.navigateTo({ url: '/pages/forum/report?targetType=COMMENT&targetId=' + c.id })
+	}
+
+	function confirmDelete() {
+		uni.showModal({
+			title: '删除帖子',
+			content: '删除后不可恢复，确定删除吗？',
+			confirmText: '删除',
+			cancelText: '取消',
+			success: (r) => {
+				if (!r.confirm) {
+					return
+				}
+				deletePost(id.value).then((_) => {
+					uni.showToast({ title: '已删除', icon: 'none' })
+					setTimeout(() => {
+						uni.navigateBack()
+					}, 600)
+				}).catch((_) => {
+				})
+			}
+		})
+	}
+
+	// #43 拉黑发布者：拉黑后双方无法互评/互发消息
+	function onBlacklistAuthor() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.showModal({
+			title: '拉黑作者',
+			content: '拉黑后双方将无法互相评论、发消息，可在「设置-黑名单」解除。',
+			success: (res) => {
+				if (!res.confirm) {
+					return
+				}
+				blacklistUser(authorUserId.value).then((_) => {
+					uni.showToast({ title: '已拉黑', icon: 'none' })
+				}).catch((e) => {
+					uni.showToast({ title: errorMessage(e), icon: 'none' })
+				})
+			}
+		})
+	}
+
+	// 右上角「···」：本人可删除帖子，均可举报 / 拉黑作者
+	function onMore() {
+		const items : string[] = []
+		if (isMine.value) {
+			items.push('删除帖子')
+		}
+		items.push('举报帖子')
+		// 自己的帖子不给自己拉黑的入口
+		const canBlock = !isMine.value && authorUserId.value > 0
+		if (canBlock) {
+			items.push('拉黑作者')
+		}
+		items.push('取消')
+
+		uni.showActionSheet({
+			itemList: items,
+			success: (res) => {
+				const pick = items[res.tapIndex]
+				if (pick == '删除帖子') {
+					confirmDelete()
+				} else if (pick == '举报帖子') {
+					onReportPost()
+				} else if (pick == '拉黑作者') {
+					onBlacklistAuthor()
+				}
+			}
+		})
+	}
+
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 160rpx 0;
+	}
+
+	.state-sm {
+		padding: 80rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.post {
+		padding: 28rpx 32rpx;
+	}
+
+	.post-announce {
+		margin: 28rpx 32rpx;
+		padding: 32rpx 30rpx;
+		border-radius: 28rpx;
+		background-image: linear-gradient(135deg, #2c2c2c, #767676);
+	}
+
+	.post-head {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.avatar {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 36rpx;
+		background-color: #eaeaea;
+	}
+
+	.avatar-img {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 36rpx;
+	}
+
+	.avatar-announce {
+		background-color: rgba(255, 255, 255, 0.18);
+	}
+
+	.ph-body {
+		flex: 1;
+		margin-left: 20rpx;
+	}
+
+	.ph-row {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.nick {
+		font-size: 29rpx;
+		font-weight: 600;
+		color: #111111;
+	}
+
+	.nick-announce {
+		color: #ffffff;
+	}
+
+	.badge {
+		font-size: 21rpx;
+		font-weight: 700;
+		color: #111111;
+		background-color: #ffffff;
+		border-radius: 8rpx;
+		padding: 2rpx 10rpx;
+		margin-left: 14rpx;
+	}
+
+	.time {
+		font-size: 24rpx;
+		color: #b5b5b5;
+		margin-top: 6rpx;
+	}
+
+	.time-announce {
+		color: rgba(255, 255, 255, 0.5);
+	}
+
+	.content {
+		font-size: 31rpx;
+		line-height: 54rpx;
+		color: #222222;
+		margin-top: 20rpx;
+	}
+
+	.text-announce {
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.video {
+		width: 100%;
+		height: 420rpx;
+		margin-top: 20rpx;
+		border-radius: 14rpx;
+		background-color: #000000;
+	}
+
+	.gallery {
+		margin-top: 20rpx;
+		position: relative;
+	}
+
+	.swiper {
+		width: 100%;
+		height: 460rpx;
+	}
+
+	.gallery-img {
+		width: 100%;
+		height: 460rpx;
+		border-radius: 14rpx;
+		background-color: #f2f2f2;
+	}
+
+	.gallery-count {
+		position: absolute;
+		right: 18rpx;
+		bottom: 18rpx;
+		background-color: rgba(0, 0, 0, 0.4);
+		border-radius: 999rpx;
+		padding: 4rpx 16rpx;
+	}
+
+	.gallery-count-text {
+		font-size: 22rpx;
+		color: #ffffff;
+	}
+
+	.acts {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 28rpx;
+		padding-top: 22rpx;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: #f2f2f2;
+	}
+
+	.acts-announce {
+		border-top-color: rgba(255, 255, 255, 0.18);
+	}
+
+	.act {
+		flex-direction: row;
+		align-items: center;
+		margin-right: 64rpx;
+	}
+
+	.act-num {
+		font-size: 27rpx;
+		font-weight: 500;
+		color: #555555;
+		margin-left: 8rpx;
+	}
+
+	.act-num-announce {
+		color: #ffffff;
+	}
+
+	.c-head-bar {
+		padding: 24rpx 32rpx 8rpx 32rpx;
+		border-top-width: 10rpx;
+		border-top-style: solid;
+		border-top-color: #f7f7f7;
+	}
+
+	.c-title {
+		font-size: 27rpx;
+		font-weight: 600;
+		color: #111111;
+	}
+
+	.comment {
+		flex-direction: row;
+		padding: 26rpx 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f6f6f6;
+	}
+
+	.c-avatar {
+		width: 60rpx;
+		height: 60rpx;
+		border-radius: 30rpx;
+		background-color: #eaeaea;
+	}
+
+	.c-avatar-img {
+		width: 60rpx;
+		height: 60rpx;
+		border-radius: 30rpx;
+	}
+
+	.c-body {
+		flex: 1;
+		margin-left: 20rpx;
+	}
+
+	.c-head {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.c-nick {
+		font-size: 27rpx;
+		font-weight: 600;
+		color: #111111;
+	}
+
+	.c-hot {
+		font-size: 20rpx;
+		font-weight: 700;
+		color: #111111;
+		background-color: #f0f0f0;
+		border-radius: 8rpx;
+		padding: 2rpx 10rpx;
+		margin-left: 12rpx;
+	}
+
+	.c-text {
+		font-size: 28rpx;
+		line-height: 46rpx;
+		color: #333333;
+		margin-top: 8rpx;
+	}
+
+	.c-reply {
+		font-size: 28rpx;
+		color: #8f8f8f;
+	}
+
+	.c-foot {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 14rpx;
+	}
+
+	.c-time {
+		font-size: 23rpx;
+		color: #b5b5b5;
+		margin-right: 32rpx;
+	}
+
+	.c-act-text {
+		font-size: 24rpx;
+		color: #999999;
+		margin-right: 32rpx;
+	}
+
+	.c-like {
+		flex-direction: row;
+		align-items: center;
+		margin-left: auto;
+	}
+
+	.c-like-num {
+		font-size: 23rpx;
+		color: #999999;
+		margin-left: 6rpx;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 40rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+
+	.inputbar {
+		flex: none;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: #ededed;
+		background-color: #ffffff;
+		padding: 16rpx 32rpx;
+	}
+
+	.reply-chip {
+		flex-direction: row;
+		align-items: center;
+		background-color: #f4f4f4;
+		border-radius: 999rpx;
+		padding: 8rpx 20rpx;
+		margin-bottom: 12rpx;
+		align-self: flex-start;
+	}
+
+	.reply-chip-text {
+		font-size: 23rpx;
+		color: #666666;
+	}
+
+	.reply-chip-x {
+		font-size: 30rpx;
+		color: #999999;
+		margin-left: 14rpx;
+		line-height: 30rpx;
+	}
+
+	.input-row {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.inp {
+		flex: 1;
+		height: 72rpx;
+		background-color: #f5f5f5;
+		border-radius: 999rpx;
+		padding: 0 28rpx;
+		font-size: 28rpx;
+		color: #111111;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 28rpx;
+	}
+
+	.send {
+		font-size: 29rpx;
+		font-weight: 600;
+		color: #111111;
+		margin-left: 24rpx;
+	}
+
+	.send-off {
+		color: #bbbbbb;
+	}
+</style>

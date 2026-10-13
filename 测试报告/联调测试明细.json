@@ -1,0 +1,810 @@
+[
+  {
+    "module": "基础",
+    "case": "GET /ping 健康检查",
+    "expect": "code=0 status=up",
+    "actual": "code=0 status=up",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "#0 获取图形验证码",
+    "expect": "code=0 且返回 captchaId+image",
+    "actual": "code=0 有captchaId=True",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "#1~#4 注册全流程(短信→校验→密码→昵称)",
+    "expect": "code=0 拿到 token+user",
+    "actual": "token=有 uid=110",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "注册第二个用户(用于交易/聊天/拉黑)",
+    "expect": "拿到 tokenB",
+    "actual": "uid=111",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "上传",
+    "case": "#26 获取OSS直传签名 POST /upload/token",
+    "expect": "code=0 返回 uploadUrl+fileKey+headers",
+    "actual": "code=0 msg=ok http=200 data={\"uploadUrl\": \"http://127.0.0.1:8080/api/v1/upload/put?fileKey=item/2026/10/10/2",
+    "ok": true,
+    "note": "前端发帖/发布二手/换头像全部依赖此接口"
+  },
+  {
+    "module": "登录注册",
+    "case": "#5 密码登录-账号不存在分支",
+    "expect": "code=40401/业务错误",
+    "actual": "code=40401 msg=账号不存在，请先注册",
+    "ok": true,
+    "note": "不存在账号应报错"
+  },
+  {
+    "module": "登录注册",
+    "case": "#1 短信-图形验证码错误拦截",
+    "expect": "code=业务错误(图形验证码错误)",
+    "actual": "code=40003 msg=图形验证码错误或已过期",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-资料",
+    "case": "#10 我的资料 GET /user/profile",
+    "expect": "code=0 含 mobile/nickname",
+    "actual": "code=0 keys=['userId', 'nickname', 'avatarUrl', 'gender', 'bio', 'registerTime', 'mobile']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-资料",
+    "case": "#11 编辑资料 PUT /user/profile",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-资料",
+    "case": "#11 编辑资料生效校验",
+    "expect": "昵称变为 测试用户A2",
+    "actual": "nickname=测试用户A2",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-首页",
+    "case": "#14 我的信息概览 GET /user/summary",
+    "expect": "code=0 含发布/收藏/黑名单计数",
+    "actual": "code=0 keys=['user', 'unreadCount', 'myItemCount', 'myPostCount']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "鉴权",
+    "case": "未带 token 访问受保护接口",
+    "expect": "code=40101",
+    "actual": "code=40101",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "鉴权",
+    "case": "伪造 token 访问",
+    "expect": "code=40101",
+    "actual": "code=40101",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-首页/分类",
+    "case": "#17 分类列表 GET /trade/categories",
+    "expect": "code=0 且非空",
+    "actual": "code=0 数量=8",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-首页",
+    "case": "#18 物品列表 GET /trade/items",
+    "expect": "code=0 分页结构",
+    "actual": "code=0 keys=['list', 'nextCursor', 'hasMore']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-发布",
+    "case": "#20 发布二手 POST /trade/items",
+    "expect": "code=0 返回 itemId",
+    "actual": "code=0 data={'id': 9008, 'auditStatus': 'ON_SALE'}",
+    "ok": true,
+    "note": "ok"
+  },
+  {
+    "module": "交易-详情",
+    "case": "#19 物品详情 GET /trade/items/{id}",
+    "expect": "code=0 含 canChat/seller",
+    "actual": "code=0 keys=['id', 'title', 'coverUrl', 'priceFen', 'bargainable', 'status', 'favorited', 'images', 'videoUrl', 'description', 'publishTime', 'seller', 'canChat', 'disclaimer', 'isMine']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-详情",
+    "case": "#19 详情不返回 contact（隐私红线）",
+    "expect": "响应中无 contact 字段",
+    "actual": "含contact=False",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-发布",
+    "case": "#21 编辑二手 PUT /trade/items/{id}",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-我的发布",
+    "case": "#22 下架 OFF_SHELF",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-我的发布",
+    "case": "#22 重新上架 PUT_ON",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-我的发布",
+    "case": "#22 标记已售 MARK_SOLD",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-越权",
+    "case": "非本人下架他人物品",
+    "expect": "应被拒绝(业务错误)",
+    "actual": "code=40301 msg=仅可操作自己发布的物品",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-我的发布",
+    "case": "#23 我的发布 GET /trade/my-items",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-收藏",
+    "case": "#24 收藏 POST favorite",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-收藏",
+    "case": "#24 重复收藏幂等",
+    "expect": "code=0（不报错）",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-收藏",
+    "case": "#25 我的收藏 GET /trade/favorites",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-收藏",
+    "case": "#24 取消收藏 DELETE favorite",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-发布",
+    "case": "#20 发布-非法入参拦截",
+    "expect": "code=参数错误(40001)",
+    "actual": "code=40001 msg=priceFen 价格必须大于 0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "任务-列表",
+    "case": "#15 任务列表 GET /tasks",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "任务-详情",
+    "case": "#16 任务详情 GET /tasks/{id}",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-信息流",
+    "case": "#27 信息流 GET /forum/feed",
+    "expect": "code=0 混排",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-发帖",
+    "case": "#28 发帖 POST /forum/posts",
+    "expect": "code=0 返回 postId",
+    "actual": "code=0 data={'id': 11}",
+    "ok": true,
+    "note": "ok"
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#29 帖子详情 GET /forum/posts/{id}",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#30 点赞 POST like",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#30 重复点赞幂等",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#30 取消点赞 DELETE like",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#31 收藏帖子",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#31 取消收藏帖子",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-评论",
+    "case": "#33 发表评论",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-评论",
+    "case": "#32 评论列表",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-评论",
+    "case": "#34 评论点赞",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-评论",
+    "case": "#34 取消评论点赞",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#35 删除他人帖子(越权)",
+    "expect": "应被拒绝",
+    "actual": "code=40301 msg=仅可删除自己发布的帖子",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-帖子",
+    "case": "我发布的帖子 GET /forum/my-posts",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-收藏",
+    "case": "我收藏的帖子 GET /forum/my-favorites",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-详情",
+    "case": "#35 删除自己的帖子",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-发帖",
+    "case": "#28 发帖-敏感词拦截",
+    "expect": "code=40002 敏感词",
+    "actual": "code=40002 msg=内容包含敏感词「赌博」，请修改后重新发布",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "#36 发起会话(TRADE)",
+    "expect": "code=0 返回 conversationId",
+    "actual": "code=0 data={'conversationId': 8}",
+    "ok": true,
+    "note": "ok"
+  },
+  {
+    "module": "站内信",
+    "case": "#36 复用已有会话(幂等)",
+    "expect": "code=0 返回同一会话",
+    "actual": "code=0 data={'conversationId': 8}",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "#37 会话列表",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "#39 发送消息",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "#38 会话内消息列表",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "#40 未读数 GET /messages/unread-count",
+    "expect": "code=0 含未读数",
+    "actual": "code=0 data={'total': 0, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 0, 'TRADE': 0}}",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "#36 发起客服会话(CUSTOMER)",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "举报",
+    "case": "#41 举报元数据 GET /reports/meta",
+    "expect": "code=0 含 targetTypes/reasons",
+    "actual": "code=0 data={\"targetTypes\": [{\"value\": \"ITEM\", \"label\": \"二手物品\"}, {\"value\": \"POST\", \"label\": \"帖子\"}, {\"value\": \"COMMENT\", \"label\": \"评论",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "举报",
+    "case": "#42 提交举报 POST /reports",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "拉黑",
+    "case": "#43 拉黑用户 POST /blacklist/{userId}",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "拉黑",
+    "case": "#44 拉黑列表 GET /blacklist",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "拉黑",
+    "case": "#43 重复拉黑幂等",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "拉黑",
+    "case": "#43 解除拉黑",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "广告埋点",
+    "case": "#45 广告曝光上报 POST /ads/report",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "广告埋点",
+    "case": "#46 埋点批量上报 POST /analytics/events",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "广告埋点",
+    "case": "#46 埋点-非法事件名拦截",
+    "expect": "code=业务错误",
+    "actual": "code=40001",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B10 未知接口返回 40401 而非 50000",
+    "expect": "code=40401",
+    "actual": "code=40401 msg=请求的接口不存在，请检查路径是否正确",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B9 单条广告上报-非法枚举被拦",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=slot 广告位不合法",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B9 单条广告上报-合法枚举通过",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B9 单条广告上报-缺 adId/slot 被拦",
+    "expect": "code=40001",
+    "actual": "code=40001",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B1 #26 获取直传签名",
+    "expect": "code=0 含 uploadUrl/fileKey/headers",
+    "actual": "code=0 keys=['uploadUrl', 'fileKey', 'headers']",
+    "ok": "item/2026/10/10/21e8166dc53f4e65ba98cc38d696cd85.jpg",
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B1 直传 PUT 落盘",
+    "expect": "HTTP 2xx",
+    "actual": "HTTP 200",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B1 上传文件可通过 /files 回读",
+    "expect": "HTTP 200 且内容一致",
+    "actual": "HTTP 200 字节一致=True",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B1 篡改签名的直传被拒",
+    "expect": "HTTP 403 / code=40301",
+    "actual": "HTTP 200 body={\"code\":40301,\"message\":\"上传凭据校验失败\",\"data\":null}",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B2 用直传 fileKey 发布二手",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B2 详情返回可直接访问的图片 URL",
+    "expect": "images[0] 以 http 开头",
+    "actual": "images=['http://127.0.0.1:8080/files/item/2026/10/10/21e8166dc53f4e65ba98cc38d696cd85.jpg']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B3 顶层评论 replyToCommentId=0 成功",
+    "expect": "code=0",
+    "actual": "code=0 msg=ok",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B3 顶层评论(不传字段)成功",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B3 回复不存在的评论仍被拦",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=被回复的评论不存在",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B4 #36 返回对象 {conversationId}",
+    "expect": "data 为对象且含 conversationId",
+    "actual": "data={'conversationId': 8}",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B4 #39 发送消息",
+    "expect": "code=0 返回 messageId",
+    "actual": "code=0 data={'messageId': 5, 'createTime': '2026-10-10 21:20:48'}",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B4 #40 对方未读数",
+    "expect": "code=0 且 total >= 1",
+    "actual": "code=0 total=1",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "B7 概览未读数来自真实计数器",
+    "expect": "unreadCount >= 1",
+    "actual": "unreadCount=1",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "会话双向-对方可读会话内消息",
+    "expect": "code=0 且能读到刚发的消息",
+    "actual": "code=0 msg=ok 条数=2",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "会话双向-对方可回消息",
+    "expect": "code=0",
+    "actual": "code=0 msg=ok",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "卖家会话列表含该会话且 peer=发起人",
+    "expect": "peer.userId == 用户A",
+    "actual": "命中=True peer.userId=110 uid_a=110",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "进会话后未读清零",
+    "expect": "total == 0",
+    "actual": "total=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "修复验证",
+    "case": "反向发起复用同一会话",
+    "expect": "conversationId 与 A 创建的一致",
+    "actual": "A建=8 B建=8",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "#5 密码登录成功",
+    "expect": "code=0 返回 token",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "#5 密码错误提示",
+    "expect": "code=40001 手机号或密码错误",
+    "actual": "code=40001 msg=手机号或密码错误",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "#6 短信验证码登录",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "#6 短信登录-错误验证码拦截",
+    "expect": "code=40003",
+    "actual": "code=40003",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-安全",
+    "case": "#12 更换手机号",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-安全",
+    "case": "#12 换号后旧 token 失效(需重登)",
+    "expect": "code=40101",
+    "actual": "code=40101",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-安全",
+    "case": "#12 换号后新手机号可登录",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-安全",
+    "case": "#13 修改密码",
+    "expect": "code=0",
+    "actual": "code=0 msg=ok",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-安全",
+    "case": "#13 改密后新密码可用",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "忘记密码",
+    "case": "#7 重置密码",
+    "expect": "code=0 返回 token",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "忘记密码",
+    "case": "重置后新密码可登录",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-设置",
+    "case": "#9 注销账号",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "我的-设置",
+    "case": "#9 注销后禁止登录",
+    "expect": "code=40301 账号注销处理中",
+    "actual": "code=40301 msg=账号注销处理中",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "设置",
+    "case": "#8 退出登录 POST /auth/logout",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "设置",
+    "case": "退出登录后旧 token 失效(黑名单)",
+    "expect": "code=40101",
+    "actual": "code=40101",
+    "ok": true,
+    "note": ""
+  }
+]

@@ -1,0 +1,96 @@
+spring:
+  application:
+    name: shequ-backend
+  profiles:
+    active: dev
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      # 软删除统一字段（避坑清单：内容表不做物理删除）
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 鉴权（ADR-005）
+jwt:
+  secret: ${JWT_SECRET:dev-secret-please-change-0123456789abcdef}
+  expire-days: 30
+  admin-expire-hours: 2
+
+# 以下为占位，W2/W5 再接入真实服务
+oss:
+  endpoint: ${OSS_ENDPOINT:}
+  bucket: ${OSS_BUCKET:}
+  access-key-id: ${OSS_ACCESS_KEY_ID:}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+
+# 文件存储：local = 本机磁盘（开发/联调，零第三方依赖）；oss = 阿里云（上线前改这里）
+storage:
+  provider: ${STORAGE_PROVIDER:local}
+  local-dir: ${STORAGE_LOCAL_DIR:./data/upload}
+  # 对外访问基址；留空则按请求 Host 推导（真机走局域网 IP 时自动正确）
+  public-base-url: ${STORAGE_PUBLIC_BASE_URL:}
+  token-ttl-seconds: 600
+
+sms:
+  access-key-id: ${SMS_ACCESS_KEY_ID:}
+  access-key-secret: ${SMS_ACCESS_KEY_SECRET:}
+  sign-name: ${SMS_SIGN_NAME:}
+  # 签名/模板审核期间用桩实现：验证码只落日志不真发（false = 走真实实现）
+  mock-enabled: true
+  # 限频规则（避坑清单 Top1）：同号 1 分钟 1 条、每日 5 条、同 IP 每日上限
+  minute-limit: 1
+  daily-limit: 5
+  ip-daily-limit: 20
+  # 验证码校验错误累计此次数后作废，须重新发送
+  max-verify-fail: 5
+
+# 登录防撞库
+auth:
+  # 同一手机号连续错误次数上限与锁定时长
+  login-max-fail: 5
+  login-lock-minutes: 15
+  # 同一 IP 每小时登录尝试上限
+  login-ip-hourly-limit: 30
+
+# 任务模块
+task:
+  # 任务详情页风险提示文案（★ 后端下发，前端只读，需求 4.3.3）
+  risk-notice: 平台仅展示任务信息，请自行甄别真实性，切勿提前支付任何费用
+
+# 二手交易模块
+trade:
+  # 审核开关：true 发布/编辑后直接上架（admin 未落地时便于端到端演示）；false 回待审核（先审后发）
+  auto-approve: true
+  # 自动下架天数：expire_at = 发布时间 + N 天（需求 4.2.2 超期下架）
+  expire-days: 30
+  # 超期扫描定时任务（默认每 10 分钟一次）
+  expire-check-cron: 0 0/10 * * * ?
+  # 详情页免责声明（★ 后端下发，需求 4.2.7）
+  disclaimer: 平台仅提供信息撮合服务，交易风险由双方自行承担，请当面验货、谨慎汇款
+
+# 论坛模块
+sensitive:
+  # 敏感词过滤：内置演示词表见 SensitiveWordServiceImpl，这里可追加自定义词（逗号分隔）
+  extra-words: ${SENSITIVE_EXTRA_WORDS:}
+
+content-safety:
+  enabled: false
+  access-key-id: ${CONTENT_SAFETY_ACCESS_KEY_ID:}
+  access-key-secret: ${CONTENT_SAFETY_ACCESS_KEY_SECRET:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    enabled: true

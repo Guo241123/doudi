@@ -1,0 +1,100 @@
+// 埋点上报（接口文档 #46）
+// MVP 红线五事件：APP_LAUNCH / PAGE_VIEW / AD_IMPRESSION / AD_CLICK / PUBLISH
+// 设计：内存队列 + 1 秒防抖 + 满 20 条立即上报；失败静默 —— 埋点是统计用途，绝不能阻塞主流程。
+// 未登录也能上报（带 deviceId），后端会记录为游客事件。
+// 事件统一用 UTSJSONObject 构造，避免自定义类型在 uni.request 序列化时出现平台差异。
+import { reportEvents } from '../api/ads.uts'
+
+const DEVICE_KEY = 'shequ_device_id'
+const FLUSH_DELAY_MS = 1000
+const FLUSH_BATCH_SIZE = 20
+
+let queue : UTSJSONObject[] = []
+let timer : number = -1
+
+function pad(n : number) : string {
+	if (n < 10) {
+		return '0' + n
+	}
+	return '' + n
+}
+
+/** 客户端事件时间：后端接受 yyyy-MM-dd HH:mm:ss */
+function nowText() : string {
+	const d = new Date()
+	return '' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+		+ ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds())
+}
+
+/** 设备号：首次生成并持久化，游客事件靠它归因 */
+function deviceId() : string {
+	const cached = uni.getStorageSync(DEVICE_KEY)
+	if (cached != null && (cached as string) != '') {
+		return cached as string
+	}
+	const id = 'd' + Date.now().toString() + '_' + Math.floor(Math.random() * 1000000).toString()
+	uni.setStorageSync(DEVICE_KEY, id)
+	return id
+}
+
+/** 立即上报（队列满、或 App 进后台/退出前调用） */
+export function flushAnalytics() {
+	if (queue.length == 0) {
+		return
+	}
+	if (timer != -1) {
+		clearTimeout(timer)
+		timer = -1
+	}
+	const batch = queue
+	queue = []
+	reportEvents(batch).catch((_) => {
+		// 失败静默：不重试、不打扰用户
+	})
+}
+
+function scheduleFlush() {
+	if (timer != -1) {
+		return
+	}
+	timer = setTimeout(() => {
+		timer = -1
+		flushAnalytics()
+	}, FLUSH_DELAY_MS)
+}
+
+/** 记录一个事件（props 可为空） */
+export function track(name : string, props : UTSJSONObject | null) {
+	const event = {} as UTSJSONObject
+	event['name'] = name
+	event['deviceId'] = deviceId()
+	event['time'] = nowText()
+	if (props != null) {
+		event['props'] = props
+	}
+	queue.push(event)
+	if (queue.length >= FLUSH_BATCH_SIZE) {
+		flushAnalytics()
+		return
+	}
+	scheduleFlush()
+}
+
+/** #46 APP_LAUNCH：App 启动一次 */
+export function trackLaunch() {
+	track('APP_LAUNCH', null)
+}
+
+/** #46 PAGE_VIEW：页面浏览 */
+export function trackPageView(page : string) {
+	const props = {} as UTSJSONObject
+	props['page'] = page
+	track('PAGE_VIEW', props)
+}
+
+/** #46 PUBLISH：发布成功（biz = ITEM / POST） */
+export function trackPublish(biz : string) {
+	const props = {} as UTSJSONObject
+	props['biz'] = biz
+	track('PUBLISH', props)
+}

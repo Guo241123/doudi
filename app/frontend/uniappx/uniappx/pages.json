@@ -1,0 +1,205 @@
+{
+	// pages 数组第一项为启动页（启动先进入登录页，可点「游客浏览」进入交易页）
+	// 全部页面使用自定义导航栏（navigationStyle: custom），由 components/nav-bar 渲染
+	"pages": [
+		{
+			"path": "pages/login/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/login/forgot",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/trade/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/task/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/forum/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/register/mobile",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/register/password",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/register/nickname",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/trade/category",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/trade/detail",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/trade/publish",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/task/detail",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/forum/detail",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/forum/publish",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/forum/report",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/message/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/message/chat",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/posts",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/favorites",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/profile",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/settings",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/blacklist",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/security",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/my/contact-admin",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/common/webview",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		}
+	],
+	// 四 Tab：交易 / 任务 / 论坛 / 我的（图标为 static/tabbar 下自绘 PNG）
+	"tabBar": {
+		"color": "#aaaaaa",
+		"selectedColor": "#111111",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "black",
+		"fontSize": "10px",
+		"iconWidth": "19px",
+		"spacing": "4px",
+		"list": [
+			{
+				"pagePath": "pages/trade/index",
+				"text": "交易",
+				"iconPath": "static/tabbar/trade-normal.png",
+				"selectedIconPath": "static/tabbar/trade-active.png"
+			},
+			{
+				"pagePath": "pages/task/index",
+				"text": "任务",
+				"iconPath": "static/tabbar/task-normal.png",
+				"selectedIconPath": "static/tabbar/task-active.png"
+			},
+			{
+				"pagePath": "pages/forum/index",
+				"text": "论坛",
+				"iconPath": "static/tabbar/forum-normal.png",
+				"selectedIconPath": "static/tabbar/forum-active.png"
+			},
+			{
+				"pagePath": "pages/my/index",
+				"text": "我的",
+				"iconPath": "static/tabbar/mine-normal.png",
+				"selectedIconPath": "static/tabbar/mine-active.png"
+			}
+		]
+	},
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "社区",
+		"navigationBarBackgroundColor": "#FFFFFF",
+		"backgroundColor": "#FFFFFF"
+	},
+	"uniIdRouter": {}
+}

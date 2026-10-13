@@ -1,0 +1,628 @@
+<template>
+	<view class="page">
+		<nav-bar title="物品详情" :show-back="true" right-text="···" @right="onMore"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<!-- 首屏加载中 -->
+			<view v-if="loading" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 加载失败 -->
+			<view v-else-if="failed" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="loadDetail"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<template v-else>
+				<!-- 图片 / 视频（视频优先；有视频时 images 为空，见 #20） -->
+				<view class="gallery">
+					<video v-if="videoUrl != ''" class="gallery-video" :src="videoUrl" :controls="true"></video>
+					<swiper v-else-if="images.length > 0" class="gallery-swiper" @change="onSwiper">
+						<swiper-item v-for="(img, i) in images" :key="i">
+							<image class="gallery-img" :src="img" mode="aspectFill"></image>
+						</swiper-item>
+					</swiper>
+					<view v-else class="gallery-empty">
+						<text class="gallery-empty-text">暂无图片</text>
+					</view>
+					<view v-if="videoUrl == '' && images.length > 0" class="gallery-count">
+						<text class="gallery-count-text">{{ current + 1 }} / {{ images.length }}</text>
+					</view>
+				</view>
+
+				<view class="block">
+					<view class="price-row">
+						<text class="price-lg">¥{{ price }}</text>
+						<text class="tag" :class="status == 'SOLD' ? 'tag-off' : 'tag-on'">{{ statusText }}</text>
+					</view>
+					<text class="detail-title">{{ title }}</text>
+					<view class="meta">
+						<text v-if="categoryName != ''" class="meta-item">分类：{{ categoryName }}</text>
+						<text v-if="bargainable" class="meta-item">可议价</text>
+						<text v-if="publishTime != ''" class="meta-item">{{ publishTime }}</text>
+					</view>
+					<text class="desc">{{ description }}</text>
+				</view>
+
+				<!-- 卖家（#19 不含联系方式，仅展示昵称头像） -->
+				<view class="block">
+					<text class="block-title">卖家</text>
+					<view class="seller">
+						<image v-if="sellerAvatar != ''" class="seller-avatar" :src="sellerAvatar" mode="aspectFill"></image>
+						<view v-else class="seller-avatar seller-avatar-empty"></view>
+						<text class="seller-name">{{ sellerNickname }}</text>
+						<text v-if="isMine" class="seller-me">我发布的</text>
+					</view>
+				</view>
+
+				<view class="block block-last">
+					<text class="hint">{{ disclaimerText }}</text>
+				</view>
+			</template>
+		</scroll-view>
+
+		<!-- 底部操作栏：卖家显示管理操作，买家显示收藏 / 举报 / 联系卖家 -->
+		<view v-if="!loading && !failed" class="actionbar">
+			<template v-if="isMine">
+				<view class="btn-ghost" @click="onEdit">
+					<text class="btn-ghost-text">编辑</text>
+				</view>
+				<view v-if="status == 'ON_SALE'" class="btn-ghost" @click="doAction('OFF_SHELF')">
+					<text class="btn-ghost-text">下架</text>
+				</view>
+				<view v-if="status == 'ON_SALE'" class="btn-dark" @click="doAction('MARK_SOLD')">
+					<text class="btn-dark-text">标记已售</text>
+				</view>
+				<view v-else-if="status == 'OFF_SHELF'" class="btn-dark" @click="doAction('PUT_ON')">
+					<text class="btn-dark-text">重新上架</text>
+				</view>
+			</template>
+
+			<template v-else>
+				<view class="icon-btn" @click="onFav">
+					<svg-icon :name="favorited ? 'heart-filled' : 'heart'" :size="36"></svg-icon>
+					<text class="icon-btn-text">{{ favorited ? '已收藏' : '收藏' }}</text>
+				</view>
+				<view class="icon-btn" @click="onReport">
+					<svg-icon name="report" :size="36"></svg-icon>
+					<text class="icon-btn-text">举报</text>
+				</view>
+				<view class="btn-dark" :class="canChat ? '' : 'btn-disabled'" @click="onContact">
+					<text class="btn-dark-text">{{ canChat ? '联系卖家' : '已售 · 不可联系' }}</text>
+				</view>
+			</template>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 物品详情页（需求 4.2.3，原型 6）
+	// 对接《接口文档》#19 物品详情、#24 收藏/取消、#22 卖家状态操作、#36 联系卖家（TRADE 会话）
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getItemDetail, favoriteItem, unfavoriteItem, updateItemStatus } from '../../api/trade.uts'
+	import { createConversation } from '../../api/message.uts'
+	import { blacklistUser } from '../../api/report.uts'
+	import { isLogin } from '../../utils/token.uts'
+	import { errorMessage } from '../../api/request.uts'
+
+	const DEFAULT_DISCLAIMER = '平台仅提供信息撮合服务，不参与交易过程，交易风险由买卖双方自行承担。'
+
+	const id = ref(0)
+	const loading = ref(true)
+	const failed = ref(false)
+	const current = ref(0)
+
+	const title = ref('')
+	const price = ref('0')
+	const status = ref('ON_SALE')
+	const bargainable = ref(false)
+	const images = ref<string[]>([])
+	const videoUrl = ref('')
+	const description = ref('')
+	const categoryName = ref('')
+	const publishTime = ref('')
+	const sellerUserId = ref(0)
+	const sellerNickname = ref('')
+	const sellerAvatar = ref('')
+	const canChat = ref(false)
+	const disclaimer = ref('')
+	const isMine = ref(false)
+	const favorited = ref(false)
+
+	const statusText = computed<string>(() : string => {
+		return status.value == 'SOLD' ? '已售' : '在售'
+	})
+
+	const disclaimerText = computed<string>(() : string => {
+		return disclaimer.value != '' ? disclaimer.value : DEFAULT_DISCLAIMER
+	})
+
+	function fenToYuan(fen : number) : string {
+		const yuan = Math.floor(fen / 100)
+		const cent = fen % 100
+		if (cent == 0) {
+			return '' + yuan
+		}
+		let cs = '' + cent
+		if (cent < 10) {
+			cs = '0' + cs
+		}
+		return yuan + '.' + cs
+	}
+
+	function loadDetail() {
+		if (id.value <= 0) {
+			loading.value = false
+			failed.value = true
+			return
+		}
+		loading.value = true
+		failed.value = false
+		current.value = 0
+
+		getItemDetail(id.value).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			title.value = o.getString('title') ?? ''
+			price.value = fenToYuan(o.getNumber('priceFen') ?? 0)
+			status.value = o.getString('status') ?? 'ON_SALE'
+			bargainable.value = o.getBoolean('bargainable') ?? false
+			videoUrl.value = o.getString('videoUrl') ?? ''
+			description.value = o.getString('description') ?? ''
+			categoryName.value = o.getString('categoryName') ?? ''
+			publishTime.value = o.getString('publishTime') ?? ''
+			canChat.value = o.getBoolean('canChat') ?? false
+			disclaimer.value = o.getString('disclaimer') ?? ''
+			isMine.value = o.getBoolean('isMine') ?? false
+			favorited.value = o.getBoolean('favorited') ?? false
+
+			const imgs = o.getArray<string>('images')
+			const arr : string[] = []
+			if (imgs != null) {
+				for (let i = 0; i < imgs.length; i++) {
+					arr.push(imgs[i])
+				}
+			}
+			images.value = arr
+
+			const seller = o.getJSON('seller')
+			if (seller != null) {
+				sellerUserId.value = seller.getNumber('userId') ?? 0
+				sellerNickname.value = seller.getString('nickname') ?? '卖家'
+				sellerAvatar.value = seller.getString('avatar') ?? ''
+			} else {
+				sellerUserId.value = 0
+				sellerNickname.value = '卖家'
+				sellerAvatar.value = ''
+			}
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onLoad((query) => {
+		const idv = query['id']
+		if (idv != null) {
+			id.value = parseInt(idv as string, 10)
+		}
+		loadDetail()
+	})
+
+
+	function onSwiper(e : UniSwiperChangeEvent) {
+		current.value = e.detail.current
+	}
+
+	function goLogin() {
+		uni.showModal({
+			title: '提示',
+			content: '该操作需要先登录',
+			confirmText: '去登录',
+			cancelText: '取消',
+			success: (r) => {
+				if (r.confirm) {
+					uni.navigateTo({ url: '/pages/login/index' })
+				}
+			}
+		})
+	}
+
+	// 收藏 / 取消收藏（#24 幂等）
+	function onFav() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		if (favorited.value) {
+			unfavoriteItem(id.value).then((_) => {
+				favorited.value = false
+				uni.showToast({ title: '已取消收藏', icon: 'none' })
+			}).catch((_) => {
+			})
+		} else {
+			favoriteItem(id.value).then((_) => {
+				favorited.value = true
+				uni.showToast({ title: '已收藏', icon: 'none' })
+			}).catch((_) => {
+			})
+		}
+	}
+
+	// 联系卖家：发起 / 复用 TRADE 会话（#36），进入会话页留言
+	function onContact() {
+		if (!canChat.value) {
+			return
+		}
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		if (sellerUserId.value <= 0) {
+			uni.showToast({ title: '卖家信息异常', icon: 'none' })
+			return
+		}
+		createConversation('TRADE', sellerUserId.value, 0).then((data) => {
+			const o = data as UTSJSONObject | null
+			const cid = o == null ? 0 : (o.getNumber('conversationId') ?? 0)
+			if (cid <= 0) {
+				uni.showToast({ title: '会话创建失败，请重试', icon: 'none' })
+				return
+			}
+			uni.navigateTo({ url: '/pages/message/chat?conversationId=' + cid + '&type=TRADE&title=' + encodeURIComponent(sellerNickname.value) })
+		}).catch((e) => {
+			uni.showToast({ title: errorMessage(e), icon: 'none' })
+		})
+	}
+
+	function onReport() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.navigateTo({ url: '/pages/forum/report?targetType=ITEM&targetId=' + id.value })
+	}
+
+	function onEdit() {
+		uni.navigateTo({ url: '/pages/trade/publish?id=' + id.value })
+	}
+
+	// 卖家状态操作（#22）：OFF_SHELF 下架 / MARK_SOLD 标记已售 / PUT_ON 重新上架
+	function doAction(action : string) {
+		updateItemStatus(id.value, action).then((_) => {
+			let msg = '操作成功'
+			if (action == 'OFF_SHELF') {
+				msg = '已下架'
+			} else if (action == 'MARK_SOLD') {
+				msg = '已标记为已售'
+			} else if (action == 'PUT_ON') {
+				msg = '已重新上架，等待审核'
+			}
+			uni.showToast({ title: msg, icon: 'none' })
+			loadDetail()
+		}).catch((_) => {
+		})
+	}
+
+	// 右上角「···」：卖家展示管理操作，买家展示举报 / 拉黑卖家
+	// #43 拉黑卖家：拉黑后双方无法互评/互发消息
+	function onBlacklistSeller() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.showModal({
+			title: '拉黑卖家',
+			content: '拉黑后双方将无法互相评论、发消息，可在「设置-黑名单」解除。',
+			success: (res) => {
+				if (!res.confirm) {
+					return
+				}
+				blacklistUser(sellerUserId.value).then((_) => {
+					uni.showToast({ title: '已拉黑', icon: 'none' })
+				}).catch((e) => {
+					uni.showToast({ title: errorMessage(e), icon: 'none' })
+				})
+			}
+		})
+	}
+
+	function onMore() {
+		const items : string[] = []
+		if (isMine.value) {
+			items.push('编辑')
+			if (status.value == 'ON_SALE') {
+				items.push('下架')
+				items.push('标记已售')
+			} else if (status.value == 'OFF_SHELF') {
+				items.push('重新上架')
+			}
+		} else {
+			items.push('举报物品')
+			if (sellerUserId.value > 0) {
+				items.push('拉黑卖家')
+			}
+		}
+		items.push('取消')
+
+		uni.showActionSheet({
+			itemList: items,
+			success: (res) => {
+				const idx = res.tapIndex
+				const pick = items[idx]
+				if (pick == '编辑') {
+					onEdit()
+				} else if (pick == '下架') {
+					doAction('OFF_SHELF')
+				} else if (pick == '标记已售') {
+					doAction('MARK_SOLD')
+				} else if (pick == '重新上架') {
+					doAction('PUT_ON')
+				} else if (pick == '举报物品') {
+					onReport()
+				} else if (pick == '拉黑卖家') {
+					onBlacklistSeller()
+				}
+			}
+		})
+	}
+
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 180rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.gallery {
+		height: 560rpx;
+		background-color: #f2f2f2;
+		position: relative;
+	}
+
+	.gallery-swiper {
+		width: 100%;
+		height: 560rpx;
+	}
+
+	.gallery-img {
+		width: 100%;
+		height: 560rpx;
+	}
+
+	.gallery-video {
+		width: 100%;
+		height: 560rpx;
+	}
+
+	.gallery-empty {
+		height: 560rpx;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.gallery-empty-text {
+		font-size: 28rpx;
+		color: #c9c9c9;
+	}
+
+	.gallery-count {
+		position: absolute;
+		right: 24rpx;
+		bottom: 24rpx;
+		background-color: rgba(0, 0, 0, 0.45);
+		border-radius: 999rpx;
+		padding: 6rpx 20rpx;
+	}
+
+	.gallery-count-text {
+		font-size: 22rpx;
+		color: #ffffff;
+	}
+
+	.block {
+		padding: 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.block-last {
+		border-bottom-width: 0px;
+	}
+
+	.price-row {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.price-lg {
+		font-size: 52rpx;
+		font-weight: 700;
+		color: #111111;
+	}
+
+	.tag {
+		font-size: 22rpx;
+		border-radius: 8rpx;
+		padding: 4rpx 14rpx;
+		margin-left: 20rpx;
+	}
+
+	.tag-on {
+		color: #ffffff;
+		background-color: #111111;
+	}
+
+	.tag-off {
+		color: #9a9a9a;
+		background-color: #e8e8e8;
+	}
+
+	.detail-title {
+		font-size: 36rpx;
+		font-weight: 600;
+		line-height: 50rpx;
+		color: #111111;
+		margin-top: 22rpx;
+	}
+
+	.meta {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		margin-top: 20rpx;
+	}
+
+	.meta-item {
+		font-size: 24rpx;
+		color: #999999;
+		margin-right: 28rpx;
+	}
+
+	.desc {
+		font-size: 28rpx;
+		line-height: 48rpx;
+		color: #444444;
+		margin-top: 22rpx;
+	}
+
+	.block-title {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #111111;
+		margin-bottom: 20rpx;
+	}
+
+	.seller {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.seller-avatar {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 36rpx;
+	}
+
+	.seller-avatar-empty {
+		background-color: #eaeaea;
+	}
+
+	.seller-name {
+		font-size: 29rpx;
+		font-weight: 600;
+		color: #222222;
+		margin-left: 20rpx;
+	}
+
+	.seller-me {
+		font-size: 22rpx;
+		color: #999999;
+		background-color: #f2f2f2;
+		border-radius: 8rpx;
+		padding: 4rpx 14rpx;
+		margin-left: 18rpx;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+	}
+
+	.actionbar {
+		flex-direction: row;
+		align-items: center;
+		padding: 20rpx 32rpx;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: #ededed;
+		background-color: #ffffff;
+	}
+
+	.icon-btn {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		/* 固定宽度:收藏/已收藏字数不同会导致按钮变宽,把「联系卖家」挤变形 */
+		width: 120rpx;
+		margin-right: 24rpx;
+	}
+
+	.icon-btn-text {
+		font-size: 22rpx;
+		color: #666666;
+		margin-top: 6rpx;
+	}
+
+	.btn-ghost {
+		background-color: #ffffff;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 18rpx;
+		padding: 24rpx 40rpx;
+		align-items: center;
+		margin-right: 20rpx;
+	}
+
+	.btn-ghost-text {
+		font-size: 29rpx;
+		color: #111111;
+	}
+
+	.btn-dark {
+		flex: 1;
+		background-color: #111111;
+		border-radius: 18rpx;
+		padding: 28rpx;
+		align-items: center;
+	}
+
+	.btn-disabled {
+		background-color: #cccccc;
+	}
+
+	.btn-dark-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+</style>

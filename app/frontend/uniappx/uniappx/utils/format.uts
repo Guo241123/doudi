@@ -1,0 +1,28 @@
+// 通用格式化工具
+
+// 分 → 元：整数价不带小数点，带小数保留两位（避坑清单：价格用分存储）
+export function fenToYuan(fen : number) : string {
+	if (fen % 100 == 0) {
+		return (fen / 100).toString()
+	}
+	return (fen / 100).toFixed(2)
+}
+
+function pad(n : number) : string {
+	if (n < 10) {
+		return '0' + n
+	}
+	return '' + n
+}
+
+// 时间戳 → yyyy-MM-dd HH:mm
+export function formatTime(ts : number) : string {
+	const d = new Date(ts)
+	return '' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+}
+
+// 时间戳 → yyyy-MM-dd
+export function formatDate(ts : number) : string {
+	const d = new Date(ts)
+	return '' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+}

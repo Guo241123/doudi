@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>社区任务与二手交易 App · 产品原型 V1.4</title>
+<style>
+/* ============ 基础 ============ */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#111;
+  --ink2:#555;
+  --ink3:#999;
+  --line:#ededed;
+  --soft:#f5f5f5;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:#f3f3f4;color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  padding:44px 24px 90px;
+}
+
+/* ============ 页面头部 ============ */
+.page-head{max-width:1320px;margin:0 auto 44px}
+.page-head h1{font-size:26px;font-weight:700;letter-spacing:.5px}
+.page-head .sub{margin-top:10px;color:#888;font-size:13px;line-height:1.7}
+.legend{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+.legend span{font-size:12px;color:#666;border:1px solid #e2e2e2;background:#fff;border-radius:999px;padding:5px 13px}
+
+/* ============ 分组 ============ */
+.group{max-width:1320px;margin:0 auto 60px}
+.group > h2{font-size:15px;font-weight:600;padding-left:12px;border-left:3px solid var(--ink);line-height:1.2}
+.group > .desc{font-size:12px;color:#999;margin:10px 0 24px;padding-left:15px;line-height:1.7}
+.frames{display:flex;flex-wrap:wrap;gap:30px}
+
+/* ============ 手机外框 ============ */
+.frame{width:320px}
+.frame figcaption{font-size:13px;font-weight:600;margin-bottom:12px;color:#333;display:flex;align-items:center;gap:8px}
+.frame figcaption .no{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;align-items:center;justify-content:center;font-weight:500;flex:none}
+.phone{background:#fff;border:1px solid #e2e2e2;border-radius:28px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.07)}
+.screen{height:640px;border-radius:22px;overflow:hidden;background:#fff;display:flex;flex-direction:column;position:relative;border:1px solid #f2f2f2}
+
+/* 状态栏 / 导航栏 / 底部 Tab */
+.statusbar{flex:none;height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:11px;color:#a5a5a5;letter-spacing:.4px}
+.navbar{flex:none;height:46px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)}
+.navbar .title{font-size:16px;font-weight:600}
+.navbar .back{font-size:20px;line-height:1;color:var(--ink);margin-top:-2px}
+.navbar .right{margin-left:auto;font-size:12px;color:var(--ink3)}
+.navbar .publish{
+  margin-left:auto;width:30px;height:30px;border-radius:50%;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+}
+.navbar .publish svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.content{flex:1;overflow-y:auto;overflow-x:hidden}
+.content::-webkit-scrollbar{width:0;height:0}
+.tabbar{flex:none;height:54px;border-top:1px solid var(--line);display:flex;background:#fff}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:#aaa}
+.tab.active{color:var(--ink);font-weight:600}
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tab .ico{width:19px;height:19px}
+
+/* ============ 通用组件 ============ */
+.search{display:flex;align-items:center;gap:8px;background:var(--soft);border-radius:999px;padding:9px 14px;font-size:12px;color:#aaa;margin:12px 14px 0}
+.search .ico{width:14px;height:14px;stroke:#bbb}
+.banner{margin:12px 14px;height:108px;border-radius:12px;background:linear-gradient(135deg,#2c2c2c,#767676);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;letter-spacing:1px;position:relative;overflow:hidden}
+.banner.light{background:linear-gradient(135deg,#ebebeb,#d6d6d6);color:#666}
+.banner .ad-tag{position:absolute;top:8px;right:8px;font-size:9px;background:rgba(255,255,255,.28);padding:2px 6px;border-radius:4px;letter-spacing:0}
+.banner .dots{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
+.banner .dots i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.45)}
+.banner .dots i.on{background:#fff;width:12px;border-radius:3px}
+.hint{font-size:10.5px;color:#b0b0b0;line-height:1.7;padding:8px 16px 0}
+.btn-dark{width:100%;background:var(--ink);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+.btn-dark:disabled{background:#d5d5d5;color:#fff;cursor:not-allowed}
+.btn-ghost{width:100%;background:#fff;color:var(--ink);border:1px solid #ddd;border-radius:10px;padding:13px;font-size:13px;font-family:inherit;cursor:pointer}
+.btn-ghost.sm{padding:9px;font-size:12px;border-radius:8px;margin-top:10px}
+.tag{font-size:9px;padding:2px 6px;border-radius:4px;line-height:1.5}
+.tag.on{background:var(--ink);color:#fff}
+.tag.off{background:#e8e8e8;color:#9a9a9a}
+.divider{height:8px;background:#f7f7f7}
+
+/* ============ 登录 / 注册 ============ */
+.login{padding:44px 26px 26px;display:flex;flex-direction:column}
+.brand-mark{width:52px;height:52px;border-radius:15px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;letter-spacing:1px}
+.brand h3{font-size:19px;font-weight:700;margin-top:18px;letter-spacing:.5px}
+.brand p{font-size:12px;color:#aaa;margin-top:6px;letter-spacing:2px}
+.field{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:14px 0;font-size:13px;margin-top:6px}
+.field .prefix{color:var(--ink2);font-size:13px;padding-right:10px;border-right:1px solid var(--line)}
+.field input{border:none;outline:none;flex:1;font-size:13px;font-family:inherit;background:transparent;color:var(--ink)}
+.field input::placeholder{color:#c2c2c2}
+.field .eye{
+  width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+  color:#bbb;cursor:pointer;flex:none;
+}
+.field .eye svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mini-btn{font-size:11px;color:var(--ink);background:#fff;border:1px solid #ddd;border-radius:6px;padding:5px 9px;font-family:inherit;cursor:pointer}
+.mini-btn.disabled{color:#c4c4c4;border-color:#ececec;cursor:not-allowed}
+.agree{display:flex;align-items:flex-start;gap:7px;font-size:10.5px;color:#999;margin-top:18px;line-height:1.6}
+.checkbox{width:13px;height:13px;border:1px solid #ccc;border-radius:3px;flex:none;margin-top:1px}
+.login .btn-dark{margin-top:24px}
+.login .tip{font-size:10.5px;color:#c0c0c0;text-align:center;margin-top:12px}
+.login .btn-ghost{margin-top:auto}
+
+/* ===== 登录方式切换（密码登录 / 验证码登录） ===== */
+.login-tabs{display:flex;gap:22px;margin-top:26px;font-size:14px;color:#bbb;border-bottom:1px solid var(--line);padding-bottom:0}
+.login-tabs .lt{
+  font-weight:600;padding-bottom:11px;cursor:pointer;position:relative;
+  color:#bbb;transition:color .15s;
+}
+.login-tabs .lt.on{color:var(--ink)}
+.login-tabs .lt.on::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:var(--ink);border-radius:2px;
+}
+
+/* 辅助行：忘记密码 / 切换 */
+.login-helper{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:11px;color:#aaa}
+.login-helper a{color:#888;text-decoration:none;cursor:pointer;border-bottom:1px solid #ddd;padding-bottom:1px}
+.login-helper a:active{color:var(--ink)}
+
+/* ===== 登录 / 注册 跳转链接 ===== */
+.login-switch{font-size:11.5px;color:#aaa;text-align:center;margin-top:18px}
+.login-switch a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1px solid var(--ink);padding-bottom:1px;cursor:pointer}
+.reg-switch{font-size:11.5px;color:#aaa;text-align:center;margin-top:14px}
+.reg-switch a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1px solid var(--ink);padding-bottom:1px;cursor:pointer}
+
+/* ===== 注册步骤条 ===== */
+.reg{padding:30px 26px 26px;display:flex;flex-direction:column}
+.reg-head{margin-bottom:26px}
+.reg-head h3{font-size:19px;font-weight:700;letter-spacing:.3px}
+.reg-head p{font-size:11.5px;color:#aaa;margin-top:7px;line-height:1.6}
+.steps{display:flex;align-items:center;gap:0;margin:2px 0 24px}
+.step{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#c4c4c4;font-weight:500}
+.step .dot{
+  width:18px;height:18px;border-radius:50%;background:#f0f0f0;color:#b5b5b5;
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex:none;
+}
+.step.on{color:var(--ink)}
+.step.on .dot{background:var(--ink);color:#fff}
+.step-line{flex:1;height:1px;background:#ececec;margin:0 8px}
+.reg-tip{font-size:11px;color:#a5a5a5;line-height:1.7;margin-top:2px}
+
+/* ===== 密码强度 ===== */
+.pwd-strength{margin-top:14px}
+.pwd-bars{display:flex;gap:5px;margin-bottom:8px}
+.pwd-bars .bar{flex:1;height:4px;border-radius:999px;background:#ececec}
+.pwd-bars .bar.on-weak{background:#bbb}
+.pwd-bars .bar.on-mid{background:#888}
+.pwd-bars .bar.on-strong{background:#111}
+.pwd-label{font-size:10.5px;color:#a5a5a5;line-height:1.6}
+.pwd-label b{color:#555;font-weight:600}
+.pwd-rules{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.pwd-rule{display:flex;align-items:center;gap:7px;font-size:11px;color:#b0b0b0}
+.pwd-rule .ck{
+  width:13px;height:13px;border-radius:50%;border:1px solid #ddd;flex:none;
+  display:flex;align-items:center;justify-content:center;
+}
+.pwd-rule.ok{color:#333}
+.pwd-rule.ok .ck{background:var(--ink);border-color:var(--ink)}
+.pwd-rule.ok .ck::after{
+  content:"";width:5px;height:8px;border-right:1.5px solid #fff;border-bottom:1.5px solid #fff;
+  transform:rotate(45deg) translate(-1px,-1px);
+}
+
+/* ===== 昵称页 ===== */
+.avatar-picker{display:flex;flex-direction:column;align-items:center;margin:6px 0 22px}
+.avatar-picker .av{
+  width:76px;height:76px;border-radius:50%;background:#f2f2f2;border:1px dashed #d8d8d8;
+  display:flex;align-items:center;justify-content:center;color:#c4c4c4;
+}
+.avatar-picker .av svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.avatar-picker .av-tip{font-size:10.5px;color:#b5b5b5;margin-top:10px}
+.nick-count{font-size:10px;color:#c4c4c4;align-self:flex-end;padding-bottom:14px}
+
+/* ============ 分类 ============ */
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 6px;padding:16px 14px 6px}
+.cat{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:#4a4a4a}
+.cat .ci{width:42px;height:42px;border-radius:12px;background:#f4f4f4;display:flex;align-items:center;justify-content:center;color:#5a5a5a}
+.cat .ci svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* ============ 二手物品卡片 ============ */
+.item-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+.item{background:#fff;border:1px solid #f1f1f1;border-radius:12px;overflow:hidden;position:relative}
+.item .thumb{height:96px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;color:#c9c9c9;font-size:11px;letter-spacing:1px}
+.item .info{padding:8px 9px 10px}
+.item .t{font-size:12px;line-height:1.45;color:#222;height:35px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .row{display:flex;align-items:center;justify-content:space-between;margin-top:7px}
+.price{font-size:13px;font-weight:700;letter-spacing:-.2px}
+.price small{font-size:10px;font-weight:500}
+.item .fav{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;color:#777}
+.item .fav svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.6}
+
+/* 悬浮按钮（仅交易页保留） */
+.fab{position:absolute;right:16px;bottom:76px;width:48px;height:48px;border-radius:50%;background:var(--ink);color:#fff;border:none;font-size:24px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,.22);z-index:9;cursor:pointer;font-weight:300}
+
+/* ============ 详情页 ============ */
+.gallery{height:210px;background:#f2f2f2;display:flex;align-items:center;justify-content:center;color:#c9c9c9;font-size:12px;position:relative;letter-spacing:1px}
+.gallery .count{position:absolute;right:12px;bottom:12px;background:rgba(0,0,0,.5);color:#fff;font-size:10px;padding:3px 8px;border-radius:999px}
+.block{background:#fff;padding:14px 16px;border-bottom:8px solid #f7f7f7}
+.price-row{display:flex;align-items:center;gap:9px}
+.price-lg{font-size:21px;font-weight:700;letter-spacing:-.5px}
+.detail-title{font-size:14px;font-weight:600;line-height:1.5;margin-top:9px}
+.meta{display:flex;gap:14px;font-size:11px;color:#a5a5a5;margin-top:10px;flex-wrap:wrap}
+.desc{font-size:12.5px;color:#555;line-height:1.8;margin-top:12px}
+.block-title{font-size:12px;font-weight:600;margin-bottom:10px}
+.crow{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;padding:9px 0;border-bottom:1px solid #f5f5f5}
+.crow:last-child{border-bottom:none}
+.crow span{color:#999;font-size:12px}
+.crow b{font-weight:600;letter-spacing:.5px}
+.actionbar{flex:none;display:flex;gap:10px;padding:10px 14px;border-top:1px solid var(--line);background:#fff;align-items:center}
+.icon-btn{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9.5px;color:#777;background:none;border:none;font-family:inherit;cursor:pointer;padding:0 4px}
+.icon-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6}
+.actionbar .btn-dark{flex:1;padding:12px;font-size:13.5px;border-radius:9px;width:auto}
+
+/* ============ 表单 ============ */
+.upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:16px}
+.up-cell{aspect-ratio:1;border-radius:10px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:22px;color:#c4c4c4;font-weight:300}
+.up-cell.filled{background:#ececec;color:#b0b0b0;font-size:11px;letter-spacing:1px}
+.frow{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);font-size:13px}
+.frow label{width:64px;flex:none;color:#666;font-size:12.5px}
+.frow input,.frow textarea{flex:1;border:none;outline:none;font-family:inherit;font-size:12.5px;color:var(--ink);background:transparent;resize:none}
+.frow input::placeholder,.frow textarea::placeholder{color:#c4c4c4}
+.frow .val{margin-left:auto;color:#999;font-size:12px}
+.switch{width:38px;height:22px;border-radius:999px;background:var(--ink);margin-left:auto;position:relative;flex:none}
+.switch::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;right:2px}
+.switch.off{background:#ddd}
+.switch.off::after{left:2px;right:auto}
+.submit-wrap{padding:20px 16px}
+
+/* ============ 发布帖子 ============ */
+.compose{padding:16px 16px 6px}
+.compose textarea{width:100%;min-height:158px;border:none;outline:none;font-family:inherit;font-size:13.5px;line-height:1.85;color:var(--ink);resize:none;background:transparent}
+.compose textarea::placeholder{color:#c4c4c4}
+.compose-count{text-align:right;font-size:10.5px;color:#c4c4c4;padding-top:6px;border-top:1px solid #f6f6f6;margin-top:4px;padding-bottom:8px}
+
+/* ============ 举报页 ============ */
+.report-tip{padding:15px 16px;font-size:11px;color:#999;line-height:1.7;border-bottom:8px solid #f7f7f7}
+.report-tip b{display:block;font-size:12.5px;color:#333;margin-bottom:5px}
+.report-target{margin:13px 16px;padding:10px 12px;background:#fafafa;border:1px solid #f0f0f0;border-radius:10px}
+.report-target .rt-k{font-size:10px;color:#aaa}
+.report-target .rt-v{font-size:11.5px;color:#333;margin-top:5px;line-height:1.6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.radio-list{background:#fff}
+.radio-item{display:flex;align-items:center;padding:11px 16px;border-bottom:1px solid #f6f6f6;font-size:12.5px;color:#333}
+.radio-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid #d5d5d5;flex:none;margin-right:10px;position:relative}
+.radio-item.on .radio-dot{border-color:var(--ink)}
+.radio-item.on .radio-dot::after{
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:8px;height:8px;border-radius:50%;background:var(--ink);
+}
+.report-textarea{padding:13px 16px}
+.report-textarea textarea{
+  width:100%;min-height:76px;border:1px solid #ececec;border-radius:10px;
+  padding:10px 12px;font-family:inherit;font-size:12px;line-height:1.7;
+  color:var(--ink);resize:none;outline:none;background:#fafafa;
+}
+.report-textarea textarea::placeholder{color:#c4c4c4}
+.report-textarea .rt-count{text-align:right;font-size:10px;color:#c4c4c4;margin-top:5px}
+.report-submit{padding:6px 16px 18px}
+.report-note{font-size:10px;color:#b5b5b5;line-height:1.7;text-align:center;padding-top:11px}
+
+/* ============ 任务卡片 ============ */
+.task-card{background:#fff;border:1px solid #f1f1f1;border-radius:12px;margin:10px 14px;padding:14px}
+.task-card h4{font-size:13.5px;font-weight:600;line-height:1.5}
+.task-card .brief{font-size:11.5px;color:#888;line-height:1.7;margin-top:7px}
+.task-meta{display:flex;gap:8px;font-size:11px;margin-top:8px;color:#444;line-height:1.5}
+.task-meta .k{color:#b0b0b0;flex:none;width:56px}
+.attachments{display:flex;gap:6px;margin-top:11px}
+.att{width:44px;height:44px;border-radius:8px;background:#f3f3f3;display:flex;align-items:center;justify-content:center;color:#c4c4c4;font-size:10px}
+.task-publish{margin-top:11px;padding-top:9px;border-top:1px solid #f6f6f6;text-align:right;font-size:10.5px;color:#b5b5b5}
+.risk{margin:14px;padding:12px 14px;border:1px solid #e2e2e2;border-radius:10px;background:#fafafa;font-size:11.5px;color:#666;line-height:1.75}
+.risk b{display:block;font-size:11.5px;color:#333;margin-bottom:4px}
+
+/* ============ 论坛 ============ */
+.post{display:flex;gap:11px;padding:14px 16px;border-bottom:1px solid #f6f6f6}
+.avatar{width:34px;height:34px;border-radius:50%;background:#eaeaea;flex:none}
+.post-main{flex:1;min-width:0}
+.post-head{display:flex;align-items:center;gap:7px;font-size:12px}
+.post-head .nick{font-weight:600}
+.post-head .time{color:#b5b5b5;font-size:10.5px}
+.post-head .badge{font-size:9px;border:1px solid #111;color:#111;border-radius:4px;padding:1px 5px;margin-left:auto}
+.post-text{font-size:12.5px;color:#333;line-height:1.75;margin-top:7px}
+.post-imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:9px}
+.post-imgs .pi{aspect-ratio:1;background:#f2f2f2;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#c9c9c9;font-size:10px}
+.post-imgs.two{grid-template-columns:repeat(2,1fr);max-width:170px}
+
+/* ===== 公告帖：与交易广告 Banner 相同的黑灰渐变 ===== */
+.post.announce{
+  display:block;margin:14px 16px;padding:16px 15px;
+  background:linear-gradient(135deg,#2c2c2c,#767676);
+  border-radius:14px;border-bottom:none;
+  box-shadow:0 10px 24px rgba(0,0,0,.20);
+  position:relative;overflow:hidden;
+}
+.post.announce .post-inner{display:flex;gap:11px}
+.post.announce .avatar{background:rgba(255,255,255,.18)}
+.post.announce .post-head .nick{color:#fff}
+.post.announce .post-head .time{color:rgba(255,255,255,.5)}
+.post.announce .post-head .badge{background:#fff;color:#111;border-color:#fff;font-weight:700;letter-spacing:.5px}
+.post.announce .post-text{color:rgba(255,255,255,.95);font-size:13px}
+.post.announce .post-foot{border-top-color:rgba(255,255,255,.18)}
+.post.announce .pact{color:#fff}
+.post.announce .pact svg{stroke:#fff}
+.post.announce .pmore{color:rgba(255,255,255,.8)}
+
+/* ===== 首页热评 ===== */
+.hot-comment{
+  margin-top:9px;background:#fcfcfc;border:1px solid #f4f4f4;border-radius:8px;
+  padding:6px 9px;display:flex;gap:7px;align-items:center;
+}
+.hot-comment .hc-avatar{width:15px;height:15px;border-radius:50%;background:#ececec;flex:none}
+.hot-comment .hc-body{flex:1;min-width:0}
+.hot-comment .hc-text{font-size:10.5px;color:#a8a8a8;line-height:1.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hot-comment .hc-text b{color:#8f8f8f;font-weight:500;margin-right:2px}
+.hot-comment .hc-like{
+  flex:none;display:flex;align-items:center;gap:3px;
+  font-size:9.5px;color:#c2c2c2;
+}
+.hot-comment .hc-like svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* ===== 帖子底部 ===== */
+.post-foot{display:flex;align-items:center;gap:26px;margin-top:12px;padding-top:10px;border-top:1px solid #f6f6f6}
+.pact{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#666;letter-spacing:0}
+.pact svg{width:15px;height:15px;fill:none;stroke:#888;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.pmore{
+  margin-left:auto;background:none;border:none;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:15px;color:#bbb;letter-spacing:2px;
+  font-weight:700;line-height:1;padding:0 2px;
+}
+
+/* 信息流广告 */
+.ad-card{margin:0 16px 14px;padding:12px;border:1px dashed #e0e0e0;border-radius:10px;background:#fafafa;display:flex;gap:11px;align-items:center}
+.ad-card .ad-img{width:58px;height:58px;border-radius:8px;background:#ededed;flex:none;display:flex;align-items:center;justify-content:center;color:#c4c4c4;font-size:10px}
+.ad-card .ad-t{font-size:12.5px;font-weight:600}
+.ad-card .ad-d{font-size:10.5px;color:#a5a5a5;margin-top:5px;line-height:1.5}
+.ad-card .ad-flag{margin-left:auto;font-size:9px;color:#aaa;border:1px solid #e2e2e2;border-radius:4px;padding:2px 5px;background:#fff}
+
+/* ===== 评论 ===== */
+.comment-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px}
+.comment-head .ct{font-size:11px;color:#999}
+.comment-head .sort{font-size:10.5px;color:#b5b5b5;border:1px solid #ececec;border-radius:999px;padding:3px 9px;background:#fff}
+.comment{display:flex;gap:10px;padding:13px 16px;border-bottom:1px solid #f6f6f6}
+.comment .avatar{width:28px;height:28px}
+.comment-body{flex:1;min-width:0}
+.comment-body .cn{font-size:11.5px;color:#888;display:flex;align-items:center;gap:6px}
+.comment-body .cn .rank{font-size:9px;color:#fff;background:#111;border-radius:3px;padding:1px 5px;font-weight:600}
+.comment-body .ct{font-size:12.5px;color:#333;line-height:1.7;margin-top:4px}
+.comment-body .cf{font-size:10.5px;color:#b5b5b5;margin-top:7px;display:flex;align-items:center;gap:13px}
+.clike{margin-left:auto;display:flex;align-items:center;gap:4px;color:#999;font-size:10.5px}
+.clike svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.clike.on{color:#111;font-weight:600}
+.clike.on svg{fill:#111;stroke:#111}
+.inputbar{flex:none;display:flex;gap:9px;align-items:center;padding:9px 14px;border-top:1px solid var(--line);background:#fff}
+.inputbar .fake-input{flex:1;background:#f4f4f4;border-radius:999px;padding:9px 14px;font-size:12px;color:#b5b5b5}
+
+/* ============ 我的 ============ */
+.profile-card{display:flex;align-items:center;gap:14px;padding:22px 16px;border-bottom:8px solid #f7f7f7}
+.profile-card .avatar{width:56px;height:56px;border-radius:50%;background:#e6e6e6}
+.profile-card .nick{font-size:16px;font-weight:600}
+.profile-card .uid{font-size:11px;color:#a8a8a8;margin-top:6px}
+.profile-card .arrow{margin-left:auto;color:#ccc;font-size:16px}
+.menu{background:#fff}
+.menu-item{display:flex;align-items:center;padding:15px 16px;border-bottom:1px solid #f6f6f6;font-size:13px}
+.menu-item .arrow{margin-left:auto;color:#ccc;font-size:14px}
+.menu-item .badge{margin-left:8px;background:var(--ink);color:#fff;font-size:9px;border-radius:999px;padding:2px 7px}
+.menu-item .val{margin-left:8px;color:#b5b5b5;font-size:11.5px}
+.menu-item.danger{color:#111;font-weight:600}
+
+/* ============ 消息通知 ============ */
+.tabs{display:flex;gap:20px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:#999}
+.tabs .on{color:var(--ink);font-weight:600;position:relative}
+.tabs .on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-13px;width:16px;height:2px;background:var(--ink);border-radius:2px}
+.msg{display:flex;gap:11px;padding:14px 16px;border-bottom:1px solid #f6f6f6}
+.msg .dot{width:7px;height:7px;border-radius:50%;background:var(--ink);flex:none;margin-top:6px}
+.msg .dot.read{background:#e0e0e0}
+.msg-body{flex:1}
+.msg-body .mt{font-size:12.5px;font-weight:600}
+.msg-body .md{font-size:11.5px;color:#999;line-height:1.65;margin-top:5px}
+.msg-body .mtime{font-size:10px;color:#c4c4c4;margin-top:7px}
+
+/* ============ 聊天 ============ */
+.chat-head{flex:none;display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:#fafafa}
+.chat-head .avatar{width:30px;height:30px}
+.chat-head .who{font-size:12.5px;font-weight:600;line-height:1.4}
+.chat-head .who small{display:block;font-size:10px;color:#aaa;font-weight:400;margin-top:2px}
+.chat-head .role{margin-left:auto;font-size:9.5px;border:1px solid #e2e2e2;background:#fff;color:#888;border-radius:999px;padding:3px 8px}
+.chat{flex:1;overflow-y:auto;padding:16px;background:#fafafa}
+.chat::-webkit-scrollbar{width:0}
+.bubble-row{display:flex;margin-bottom:14px;gap:8px}
+.bubble-row.me{justify-content:flex-end}
+.bubble{max-width:74%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.7}
+.bubble.other{background:#fff;border:1px solid #eee;border-top-left-radius:3px}
+.bubble.mine{background:var(--ink);color:#fff;border-top-right-radius:3px}
+.chat-time{text-align:center;font-size:10px;color:#bbb;margin:6px 0 14px}
+.quick-links{display:flex;justify-content:center;gap:8px;margin-bottom:4px}
+
+.footnote{max-width:1320px;margin:60px auto 0;font-size:11.5px;color:#a5a5a5;line-height:1.9;border-top:1px solid #e5e5e5;padding-top:22px}
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <h1>社区任务与二手交易 App · 产品原型</h1>
+  <p class="sub">
+    版本 V1.4（评审修订版）· 2026-10-10 · 形态：App（iOS / Android）<br>
+    设计风格：简约 · 黑白灰 · 无彩色状态色
+  </p>
+  <div class="legend">
+    <span>App 仅用户端，无管理入口</span>
+    <span>登录 / 注册入口分离</span>
+    <span>支持密码登录 · 验证码登录</span>
+    <span>任务不接单、不流转状态</span>
+    <span>二手只有在售 / 已售</span>
+    <span>评论：敏感词过滤 + 先发后审</span>
+    <span>游客可浏览，操作触发登录</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ================= 一、账号与登录 ================= -->
+<section class="group">
+  <h2>一、账号与登录</h2>
+  <p class="desc">
+    登录方式（两个 Tab 切换）：① 密码登录（手机号 + 密码）→ ② 验证码登录（手机号 + 短信验证码）。<br>
+    注册：从登录页“立即注册”进入，三步完成——① 手机号 + 验证码 → ② 设置密码（强度校验）→ ③ 设置昵称与头像。设置页见「五、我的」模块。
+  </p>
+  <div class="frames">
+
+    <!-- 登录①：密码登录 -->
+    <figure class="frame">
+      <figcaption><span class="no">1</span>登录页 · 密码登录</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="content login">
+          <div class="brand">
+            <div class="brand-mark">邻</div>
+            <h3>社区 · 交易</h3>
+            <p>任务 / 二手 / 论坛</p>
+          </div>
+
+          <!-- 登录方式 Tab -->
+          <div class="login-tabs">
+            <span class="lt on">密码登录</span>
+            <span class="lt">验证码登录</span>
+          </div>
+
+          <div class="field"><span class="prefix">+86</span><input placeholder="请输入手机号"></div>
+          <div class="field">
+            <input type="password" placeholder="请输入密码">
+            <span class="eye"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+          </div>
+
+          <div class="login-helper">
+            <a>忘记密码？</a>
+            <a>验证码登录 ›</a>
+          </div>
+
+          <button class="btn-dark">登录</button>
+          <label class="agree"><span class="checkbox"></span>我已阅读并同意《用户协议》与《隐私政策》</label>
+          <button class="btn-ghost">游客浏览 →</button>
+          <p class="login-switch">还没有账号？<a>立即注册</a></p>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 登录②：验证码登录 -->
+    <figure class="frame">
+      <figcaption><span class="no">2</span>登录页 · 验证码登录</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="content login">
+          <div class="brand">
+            <div class="brand-mark">邻</div>
+            <h3>社区 · 交易</h3>
+            <p>任务 / 二手 / 论坛</p>
+          </div>
+
+          <!-- 登录方式 Tab -->
+          <div class="login-tabs">
+            <span class="lt">密码登录</span>
+            <span class="lt on">验证码登录</span>
+          </div>
+
+          <div class="field"><span class="prefix">+86</span><input placeholder="请输入手机号"></div>
+          <div class="field"><input placeholder="请输入验证码"><button class="mini-btn">获取验证码</button></div>
+
+          <div class="login-helper">
+            <a>密码登录 ›</a>
+            <span style="color:#c4c4c4">未注册手机号将自动创建账号</span>
+          </div>
+
+          <button class="btn-dark">登录</button>
+          <label class="agree"><span class="checkbox"></span>我已阅读并同意《用户协议》与《隐私政策》，未注册手机号将自动创建账号</label>
+          <button class="btn-ghost">游客浏览 →</button>
+          <p class="login-switch">还没有账号？<a>立即注册</a></p>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 注册①：手机号 + 验证 -->
+    <figure class="frame">
+      <figcaption><span class="no">3</span>注册① · 手机号验证</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">注册</span></div>
+        <div class="content reg">
+          <div class="reg-head">
+            <h3>验证手机号</h3>
+            <p>我们将向该手机号发送验证码，用于确认你的身份</p>
+          </div>
+
+          <div class="steps">
+            <div class="step on"><span class="dot">1</span>手机号</div>
+            <div class="step-line"></div>
+            <div class="step"><span class="dot">2</span>密码</div>
+            <div class="step-line"></div>
+            <div class="step"><span class="dot">3</span>昵称</div>
+          </div>
+
+          <div class="field"><span class="prefix">+86</span><input placeholder="请输入手机号" value="138 8888 6621"></div>
+          <div class="field"><input placeholder="请输入 6 位验证码"><button class="mini-btn">获取验证码</button></div>
+          <p class="reg-tip">同一手机号 1 分钟内最多获取 1 条，每日最多 5 条</p>
+
+          <button class="btn-dark" style="margin-top:26px">下一步</button>
+
+          <label class="agree" style="margin-top:auto">
+            <span class="checkbox"></span>
+            我已阅读并同意《用户协议》与《隐私政策》，并授权平台在必要范围内使用我提交的信息
+          </label>
+          <p class="reg-switch">已有账号？<a>返回登录</a></p>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 注册②：设置密码 -->
+    <figure class="frame">
+      <figcaption><span class="no">4</span>注册② · 设置密码</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">设置密码</span></div>
+        <div class="content reg">
+          <div class="reg-head">
+            <h3>设置登录密码</h3>
+            <p>用于后续登录与账号安全验证</p>
+          </div>
+
+          <div class="steps">
+            <div class="step"><span class="dot">✓</span>手机号</div>
+            <div class="step-line"></div>
+            <div class="step on"><span class="dot">2</span>密码</div>
+            <div class="step-line"></div>
+            <div class="step"><span class="dot">3</span>昵称</div>
+          </div>
+
+          <div class="field">
+            <input type="password" placeholder="请输入密码" value="Abc123456">
+            <span class="eye"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+          </div>
+          <div class="field">
+            <input type="password" placeholder="请再次输入密码" value="Abc123456">
+            <span class="eye"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+          </div>
+
+          <!-- 密码强度 -->
+          <div class="pwd-strength">
+            <div class="pwd-bars">
+              <span class="bar on-strong"></span>
+              <span class="bar on-strong"></span>
+              <span class="bar on-strong"></span>
+            </div>
+            <div class="pwd-label">密码强度：<b>强</b></div>
+
+            <div class="pwd-rules">
+              <div class="pwd-rule ok"><span class="ck"></span>长度 8～20 位</div>
+              <div class="pwd-rule ok"><span class="ck"></span>包含字母与数字</div>
+              <div class="pwd-rule ok"><span class="ck"></span>建议包含大写字母或符号</div>
+            </div>
+          </div>
+
+          <button class="btn-dark" style="margin-top:26px">下一步</button>
+          <p class="reg-tip" style="text-align:center;margin-top:12px">密码用于账号登录，请勿使用与其他平台相同的密码</p>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 注册③：设置昵称 -->
+    <figure class="frame">
+      <figcaption><span class="no">5</span>注册③ · 设置昵称</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">设置昵称</span></div>
+        <div class="content reg">
+          <div class="reg-head">
+            <h3>完善你的资料</h3>
+            <p>昵称将展示在论坛、二手与任务等场景</p>
+          </div>
+
+          <div class="steps">
+            <div class="step"><span class="dot">✓</span>手机号</div>
+            <div class="step-line"></div>
+            <div class="step"><span class="dot">✓</span>密码</div>
+            <div class="step-line"></div>
+            <div class="step on"><span class="dot">3</span>昵称</div>
+          </div>
+
+          <div class="avatar-picker">
+            <div class="av">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <div class="av-tip">点击上传头像（选填）</div>
+          </div>
+
+          <div class="field">
+            <input placeholder="设置昵称（2～12 字）" value="李明">
+            <span class="nick-count">2 / 12</span>
+          </div>
+
+          <div class="frow" style="border-bottom:1px solid var(--line);padding-left:0;padding-right:0">
+            <label style="width:auto">性别</label>
+            <span class="val" style="margin-left:0;color:#333">男</span>
+            <span class="val">›</span>
+          </div>
+
+          <button class="btn-dark" style="margin-top:26px">完成注册</button>
+          <p class="reg-tip" style="text-align:center;margin-top:12px">注册即表示同意接收审核结果等 App 内消息通知</p>
+        </div>
+      </div></div>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ================= 二、交易 ================= -->
+<section class="group">
+  <h2>二、交易模块</h2>
+  <p class="desc">分类后台可配置（2 排 × 4 个，共 8 个）· Banner 最多 5 张轮播 · 双列物品流 · 状态只有在售 / 已售。</p>
+  <div class="frames">
+
+    <!-- 交易首页 -->
+    <figure class="frame">
+      <figcaption><span class="no">6</span>交易首页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="title">交易</span><span class="right">搜索 ⌕</span></div>
+        <div class="content">
+          <div class="search"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>搜索物品 / 关键词</div>
+
+          <div class="banner">
+            <span class="ad-tag">广告</span>
+            广告 Banner · 最多 5 张轮播
+            <div class="dots"><i class="on"></i><i></i><i></i></div>
+          </div>
+
+          <div class="cats">
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></div>数码</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16"/></svg></div>家电</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><path d="M9 4l3 2 3-2 4 3-2 3v10H7V10L5 7l4-3Z"/></svg></div>服饰</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><path d="M5 4h6v16H5z"/><path d="M13 4h6v16h-6z"/></svg></div>图书</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16"/></svg></div>运动</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v9H4v-9Z"/></svg></div>家居</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><path d="M12 3s5 5.5 5 9a5 5 0 0 1-10 0c0-3.5 5-9 5-9Z"/></svg></div>美妆</div>
+            <div class="cat"><div class="ci"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg></div>其他</div>
+          </div>
+
+          <div class="item-grid">
+            <div class="item">
+              <div class="thumb">图片</div>
+              <span class="fav"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg></span>
+              <div class="info">
+                <div class="t">iPad Air 5 64G 深空灰 九成新</div>
+                <div class="row"><span class="price"><small>¥</small>2350</span><span class="tag on">在售</span></div>
+              </div>
+            </div>
+            <div class="item">
+              <div class="thumb">图片</div>
+              <span class="fav"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg></span>
+              <div class="info">
+                <div class="t">小米电饭煲 4L 全新未拆封</div>
+                <div class="row"><span class="price"><small>¥</small>159</span><span class="tag on">在售</span></div>
+              </div>
+            </div>
+            <div class="item">
+              <div class="thumb">图片</div>
+              <span class="fav"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg></span>
+              <div class="info">
+                <div class="t">宜家书桌 120×60 自提</div>
+                <div class="row"><span class="price"><small>¥</small>120</span><span class="tag off">已售</span></div>
+              </div>
+            </div>
+            <div class="item">
+              <div class="thumb">图片</div>
+              <span class="fav"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg></span>
+              <div class="info">
+                <div class="t">考研英语真题全套 无笔记</div>
+                <div class="row"><span class="price"><small>¥</small>35</span><span class="tag on">在售</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="fab">+</button>
+        <div class="tabbar">
+          <div class="tab active"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16l-1.3 12.2a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3L4 7Z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/></svg>交易</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>任务</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>论坛</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>我的</div>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 物品详情 -->
+    <figure class="frame">
+      <figcaption><span class="no">7</span>物品详情页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">物品详情</span><span class="right">···</span></div>
+        <div class="content">
+          <div class="gallery">图片 / 视频轮播<span class="count">1 / 3</span></div>
+
+          <div class="block">
+            <div class="price-row"><span class="price-lg">¥2350</span><span class="tag on">在售</span></div>
+            <div class="detail-title">iPad Air 5 64G 深空灰 九成新 无拆修</div>
+            <div class="meta"><span>分类：数码</span><span>可议价</span><span>2 小时前</span></div>
+            <p class="desc">2024 年购买，日常看视频使用，屏幕无划痕，配原装充电器，可当面验机。</p>
+          </div>
+
+          <div class="block">
+            <div class="block-title">联系方式</div>
+            <div class="crow"><span>微信</span><b>zh****21</b></div>
+            <div class="crow"><span>电话</span><b>138****6621</b></div>
+            <p class="hint" style="padding-left:0">仅登录用户可见 · 点击下方按钮可一键复制完整信息</p>
+            <button class="btn-ghost sm">一键复制联系方式</button>
+          </div>
+
+          <div class="block" style="border-bottom:none">
+            <p class="hint" style="padding-left:0">免责声明：平台仅提供信息撮合服务，不参与交易过程，交易风险由买卖双方自行承担。</p>
+          </div>
+        </div>
+        <div class="actionbar">
+          <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>收藏</button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M12 4v12"/><path d="M6 10l6 6 6-6"/><path d="M5 20h14"/></svg>举报</button>
+          <button class="btn-dark">联系卖家</button>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 发布二手 -->
+    <figure class="frame">
+      <figcaption><span class="no">8</span>发布二手</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">发布二手</span><span class="right">提交</span></div>
+        <div class="content">
+          <div class="upload-grid">
+            <div class="up-cell filled">图片</div>
+            <div class="up-cell filled">视频</div>
+            <div class="up-cell">+</div>
+          </div>
+          <p class="hint" style="padding:0 16px">最多 9 张图或 1 个视频（视频 ≤ 100MB、时长 ≤ 60 秒）</p>
+
+          <div class="frow" style="margin-top:12px"><label>标题</label><input placeholder="一句话描述你的物品"></div>
+          <div class="frow"><label>描述</label><textarea rows="2" placeholder="成色、购买时间、使用情况…"></textarea></div>
+          <div class="frow"><label>价格</label><input placeholder="0.00" style="max-width:100px"><span class="val">元</span></div>
+          <div class="frow"><label>分类</label><span class="val" style="margin-left:0;color:#333">数码</span><span class="val">›</span></div>
+          <div class="frow"><label>联系方式</label><input placeholder="微信 / QQ / 电话"></div>
+          <div class="frow"><label>可议价</label><div class="switch"></div></div>
+
+          <div class="submit-wrap">
+            <button class="btn-dark">提交审核</button>
+            <p class="hint" style="text-align:center;padding-top:12px">提交后进入审核，24 小时内完成，结果可在「我的发布」查看</p>
+          </div>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 我的发布 -->
+    <figure class="frame">
+      <figcaption><span class="no">9</span>我的发布</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">我的发布</span></div>
+        <div class="content">
+          <div class="tabs"><span class="on">二手物品</span><span>论坛帖子</span></div>
+          <div class="item-grid" style="grid-template-columns:1fr">
+            <div class="item" style="display:flex;gap:12px;padding:12px">
+              <div class="thumb" style="width:76px;height:76px;border-radius:9px;flex:none">图片</div>
+              <div style="flex:1;min-width:0">
+                <div class="t" style="height:auto">iPad Air 5 64G 深空灰 九成新</div>
+                <div class="row" style="margin-top:8px"><span class="price"><small>¥</small>2350</span><span class="tag on">已通过</span></div>
+                <div class="row" style="margin-top:9px;justify-content:flex-start;gap:14px;font-size:11px;color:#999">
+                  <span>编辑</span><span>下架</span><span>标记已售</span>
+                </div>
+              </div>
+            </div>
+            <div class="item" style="display:flex;gap:12px;padding:12px">
+              <div class="thumb" style="width:76px;height:76px;border-radius:9px;flex:none">图片</div>
+              <div style="flex:1;min-width:0">
+                <div class="t" style="height:auto">宜家书桌 120×60 自提</div>
+                <div class="row" style="margin-top:8px"><span class="price"><small>¥</small>120</span><span class="tag off">待审核</span></div>
+                <div class="row" style="margin-top:9px;justify-content:flex-start;gap:14px;font-size:11px;color:#999">
+                  <span>编辑</span><span>撤回</span>
+                </div>
+              </div>
+            </div>
+            <div class="item" style="display:flex;gap:12px;padding:12px">
+              <div class="thumb" style="width:76px;height:76px;border-radius:9px;flex:none">图片</div>
+              <div style="flex:1;min-width:0">
+                <div class="t" style="height:auto">某违规商品标题示例</div>
+                <div class="row" style="margin-top:8px"><span class="price"><small>¥</small>80</span><span class="tag off">已拒绝</span></div>
+                <p class="hint" style="padding:8px 0 0">拒绝原因：图片含违规内容，请修改后重新提交</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ================= 三、任务 ================= -->
+<section class="group">
+  <h2>三、任务模块</h2>
+  <p class="desc">
+    任务卡片仅展示：标题、简述、报酬说明（纯文字）、截止时间、附件；发布时间位于卡片最下方右侧。无状态、无接单按钮、无人数。<br>
+    任务详情的「联系任务负责人」用于对接工作，与「我的 → 客服」（平台客服）不是同一个入口。
+  </p>
+  <div class="frames">
+
+    <figure class="frame">
+      <figcaption><span class="no">10</span>任务首页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="title">任务</span></div>
+        <div class="content">
+          <div class="banner light">
+            <span class="ad-tag" style="background:rgba(0,0,0,.06);color:#999">广告</span>
+            广告 Banner
+          </div>
+
+          <div class="task-card">
+            <h4>社区周末市集 · 摊位协助</h4>
+            <p class="brief">负责摊位布置、物品登记与现场引导，约 4 小时。</p>
+            <div class="task-meta"><span class="k">报酬说明</span><span>150 元 / 天，线下结算</span></div>
+            <div class="task-meta"><span class="k">截止时间</span><span>2026-10-20 18:00</span></div>
+            <div class="attachments"><span class="att">图</span><span class="att">图</span></div>
+            <div class="task-publish">发布于 2026-10-08 15:20</div>
+          </div>
+
+          <div class="task-card">
+            <h4>社区图书角整理志愿者</h4>
+            <p class="brief">图书分类上架、贴标签，可长期参与，时间灵活。</p>
+            <div class="task-meta"><span class="k">报酬说明</span><span>积分 20 分 / 次（纯文字说明）</span></div>
+            <div class="task-meta"><span class="k">截止时间</span><span>2026-10-31 12:00</span></div>
+            <div class="attachments"><span class="att">图</span></div>
+            <div class="task-publish">发布于 2026-10-07 10:05</div>
+          </div>
+
+          <div class="task-card">
+            <h4>社区活动摄影记录</h4>
+            <p class="brief">记录活动现场，自备相机，后期简单调色。</p>
+            <div class="task-meta"><span class="k">报酬说明</span><span>面谈，线下结算</span></div>
+            <div class="task-meta"><span class="k">截止时间</span><span>2026-10-25 09:00</span></div>
+            <div class="task-publish">发布于 2026-10-05 19:42</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16l-1.3 12.2a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3L4 7Z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/></svg>交易</div>
+          <div class="tab active"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>任务</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>论坛</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>我的</div>
+        </div>
+      </div></div>
+    </figure>
+
+    <figure class="frame">
+      <figcaption><span class="no">11</span>任务详情页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">任务详情</span></div>
+        <div class="content">
+          <div class="block" style="border-bottom:1px solid var(--line)">
+            <div class="detail-title" style="font-size:16px;margin-top:0">社区周末市集 · 摊位协助</div>
+          </div>
+
+          <div class="block" style="border-bottom:1px solid var(--line)">
+            <div class="block-title">任务说明</div>
+            <p class="desc" style="margin-top:0">负责摊位布置、物品登记与现场引导，约 4 小时，需提前 30 分钟到场。</p>
+          </div>
+
+          <div class="block" style="border-bottom:1px solid var(--line)">
+            <div class="crow"><span>报酬说明</span><b>150 元 / 天，线下结算</b></div>
+            <div class="crow"><span>截止时间</span><b>2026-10-20 18:00</b></div>
+            <div class="crow"><span>发布时间</span><b>2026-10-08 15:20</b></div>
+          </div>
+
+          <div class="block" style="border-bottom:1px solid var(--line)">
+            <div class="block-title">任务负责人</div>
+            <div class="crow"><span>负责人</span><b>王老师 · 社区服务中心</b></div>
+            <p class="hint" style="padding-left:0">感兴趣请直接联系任务负责人沟通工作细节，平台不参与任务流转。</p>
+          </div>
+
+          <div class="block" style="border-bottom:1px solid var(--line)">
+            <div class="block-title">附件</div>
+            <div class="attachments" style="margin-top:0">
+              <span class="att" style="width:64px;height:64px">图片</span>
+              <span class="att" style="width:64px;height:64px">图片</span>
+            </div>
+          </div>
+
+          <div class="risk">
+            <b>风险提示</b>
+            平台仅展示任务信息，请自行甄别真实性，切勿提前支付任何费用。
+          </div>
+        </div>
+        <div class="actionbar">
+          <button class="btn-dark">联系任务负责人</button>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 任务对接（联系任务负责人） -->
+    <figure class="frame">
+      <figcaption><span class="no">12</span>任务对接 · 联系任务负责人</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">联系任务负责人</span><span class="right">···</span></div>
+        <div class="chat-head">
+          <div class="avatar"></div>
+          <div class="who">王老师<small>社区服务中心 · 该任务负责人</small></div>
+          <span class="role">任务对接</span>
+        </div>
+        <div class="chat">
+          <div class="chat-time">今天 09:30</div>
+          <div class="bubble-row me">
+            <div class="bubble mine">您好，我在任务区看到「社区周末市集 · 摊位协助」，想确认一下具体工作内容。</div>
+          </div>
+          <div class="bubble-row">
+            <div class="bubble other">你好，主要是摊位布置和现场引导，周六 8:30 到社区中心北门集合。</div>
+          </div>
+          <div class="bubble-row me">
+            <div class="bubble mine">好的，报酬是当天线下结算吗？</div>
+          </div>
+          <div class="bubble-row">
+            <div class="bubble other">是的，活动结束后现场结算，150 元 / 天。</div>
+          </div>
+          <div class="chat-time">此对话仅对接该任务，与平台客服无关</div>
+        </div>
+        <div class="inputbar">
+          <div class="fake-input">输入消息…</div>
+          <span style="font-size:12px;color:#111;font-weight:600">发送</span>
+        </div>
+      </div></div>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ================= 四、论坛 ================= -->
+<section class="group">
+  <h2>四、论坛模块</h2>
+  <p class="desc">
+    类微博信息流 · 每 5～8 条帖子插入一条信息流广告 · 评论为敏感词过滤 + 先发后审。<br>
+    公告帖使用与交易广告 Banner 相同的黑灰渐变；帖子底部为「点赞 + 评论 + ···」；举报页含原因单选与补充说明。
+  </p>
+  <div class="frames">
+
+    <!-- 论坛首页 -->
+    <figure class="frame">
+      <figcaption><span class="no">13</span>论坛首页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar">
+          <span class="title">论坛</span>
+          <span class="publish" title="发布">
+            <svg viewBox="0 0 24 24"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z"/><path d="M14.5 5.5l4 4"/></svg>
+          </span>
+        </div>
+        <div class="content">
+
+          <!-- 公告帖：黑灰渐变背景 -->
+          <div class="post announce">
+            <div class="post-inner">
+              <div class="avatar"></div>
+              <div class="post-main">
+                <div class="post-head">
+                  <span class="nick">社区小助手</span>
+                  <span class="time">1 小时前</span>
+                  <span class="badge">公告</span>
+                </div>
+                <p class="post-text">本周六社区市集开始报名啦，摊主与志愿者均可参与，详情见任务区。</p>
+                <div class="post-foot">
+                  <span class="pact">
+                    <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>8
+                  </span>
+                  <span class="pact">
+                    <svg viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>2
+                  </span>
+                  <span class="pmore" title="举报">···</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 普通帖 + 热评 + 举报入口 -->
+          <div class="post">
+            <div class="avatar"></div>
+            <div class="post-main">
+              <div class="post-head"><span class="nick">阿哲</span><span class="time">2 小时前</span></div>
+              <p class="post-text">周末天气不错，有没有人一起去爬山？路线已经踩过点，难度不高。</p>
+              <div class="post-imgs two"><div class="pi">图片</div><div class="pi">图片</div></div>
+
+              <div class="hot-comment">
+                <div class="hc-avatar"></div>
+                <div class="hc-body">
+                  <div class="hc-text"><b>小林：</b>算我一个，装备齐全，可以带路。</div>
+                </div>
+                <span class="hc-like">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>46
+                </span>
+              </div>
+
+              <div class="post-foot">
+                <span class="pact">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>12
+                </span>
+                <span class="pact">
+                  <svg viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>3
+                </span>
+                <span class="pmore" title="举报">···</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ad-card">
+            <div class="ad-img">广告</div>
+            <div>
+              <div class="ad-t">信息流广告位</div>
+              <div class="ad-d">每 5～8 条帖子插入一条</div>
+            </div>
+            <span class="ad-flag">广告</span>
+          </div>
+
+          <!-- 普通帖 + 热评 -->
+          <div class="post">
+            <div class="avatar"></div>
+            <div class="post-main">
+              <div class="post-head"><span class="nick">小林</span><span class="time">3 小时前</span></div>
+              <p class="post-text">分享一下最近整理书桌的心得，桌面清空之后效率真的提升不少。</p>
+              <div class="post-imgs"><div class="pi">图片</div><div class="pi">图片</div><div class="pi">图片</div></div>
+
+              <div class="hot-comment">
+                <div class="hc-avatar"></div>
+                <div class="hc-body">
+                  <div class="hc-text"><b>阿哲：</b>清空桌面之后确实更容易专注，我也试试。</div>
+                </div>
+                <span class="hc-like">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>21
+                </span>
+              </div>
+
+              <div class="post-foot">
+                <span class="pact">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>28
+                </span>
+                <span class="pact">
+                  <svg viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>6
+                </span>
+                <span class="pmore" title="举报">···</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="tabbar">
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16l-1.3 12.2a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3L4 7Z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/></svg>交易</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>任务</div>
+          <div class="tab active"><svg class="ico" viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 0 1 20 12Z"/></svg>论坛</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>我的</div>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 帖子详情 -->
+    <figure class="frame">
+      <figcaption><span class="no">14</span>帖子详情页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">帖子详情</span><span class="right">···</span></div>
+        <div class="content">
+          <div class="post" style="border-bottom:1px solid var(--line)">
+            <div class="avatar"></div>
+            <div class="post-main">
+              <div class="post-head"><span class="nick">阿哲</span><span class="time">2 小时前</span></div>
+              <p class="post-text">周末天气不错，有没有人一起去爬山？路线已经踩过点，难度不高，来回大概 5 小时。</p>
+              <div class="post-imgs two"><div class="pi">图片</div><div class="pi">图片</div></div>
+              <div class="post-foot">
+                <span class="pact">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>12
+                </span>
+                <span class="pact">
+                  <svg viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>3
+                </span>
+                <span class="pmore" title="举报">···</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="comment-head">
+            <span class="ct">热门评论（按点赞排序）</span>
+            <span class="sort">最热 ↓</span>
+          </div>
+
+          <div class="comment">
+            <div class="avatar"></div>
+            <div class="comment-body">
+              <div class="cn">小林 <span class="rank">TOP1</span></div>
+              <div class="ct">算我一个，装备齐全，可以带路。</div>
+              <div class="cf">
+                <span>回复</span>
+                <span>举报</span>
+                <span>1 小时前</span>
+                <span class="clike on">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>46
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="comment">
+            <div class="avatar"></div>
+            <div class="comment-body">
+              <div class="cn">阿哲 · 作者</div>
+              <div class="ct">好的，周六早上 7 点山脚集合。</div>
+              <div class="cf">
+                <span>回复</span>
+                <span>举报</span>
+                <span>40 分钟前</span>
+                <span class="clike">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>18
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="comment">
+            <div class="avatar"></div>
+            <div class="comment-body">
+              <div class="cn">过客</div>
+              <div class="ct">评论先发后审，已通过敏感词过滤。</div>
+              <div class="cf">
+                <span>回复</span>
+                <span>举报</span>
+                <span>10 分钟前</span>
+                <span class="clike">
+                  <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7C19 15.6 12 20 12 20Z"/></svg>5
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="inputbar">
+          <div class="fake-input">写评论…</div>
+          <span style="font-size:12px;color:#111;font-weight:600">发送</span>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 发布帖子 -->
+    <figure class="frame">
+      <figcaption><span class="no">15</span>发布帖子</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">发布帖子</span><span class="right" style="color:#111;font-weight:600">发布</span></div>
+        <div class="content">
+          <div class="compose">
+            <textarea placeholder="分享你的想法…"></textarea>
+            <div class="compose-count">0 / 1000</div>
+          </div>
+
+          <div class="upload-grid" style="padding-top:6px">
+            <div class="up-cell filled">图片</div>
+            <div class="up-cell filled">视频</div>
+            <div class="up-cell">+</div>
+          </div>
+          <p class="hint" style="padding:0 16px">最多 9 张图或 1 个视频（视频 ≤ 100MB、时长 ≤ 60 秒）</p>
+
+          <div class="frow" style="margin-top:12px"><label>话题</label><input placeholder="添加话题（选填）"></div>
+          <div class="frow"><label>位置</label><input placeholder="所在位置（选填）"></div>
+
+          <div class="submit-wrap">
+            <button class="btn-dark">发布</button>
+            <p class="hint" style="text-align:center;padding-top:12px">发布后立即展示，如含违规内容将由管理员事后处理</p>
+          </div>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 举报页 -->
+    <figure class="frame">
+      <figcaption><span class="no">16</span>举报页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">举报</span></div>
+        <div class="content">
+
+          <div class="report-tip">
+            <b>为什么要举报？</b>
+            你的举报将帮助平台维护社区秩序。请选择最符合的举报原因，我们会尽快核实处理。
+          </div>
+
+          <div class="report-target">
+            <div class="rt-k">举报对象</div>
+            <div class="rt-v">帖子：周末天气不错，有没有人一起去爬山？路线已经踩过点，难度不高。</div>
+          </div>
+
+          <p class="hint" style="padding:4px 16px 8px;color:#999;font-size:11px">请选择举报原因</p>
+          <div class="radio-list">
+            <div class="radio-item on"><span class="radio-dot"></span>垃圾广告</div>
+            <div class="radio-item"><span class="radio-dot"></span>色情低俗</div>
+            <div class="radio-item"><span class="radio-dot"></span>诈骗</div>
+            <div class="radio-item"><span class="radio-dot"></span>侵权</div>
+            <div class="radio-item"><span class="radio-dot"></span>其他</div>
+          </div>
+
+          <div class="report-textarea">
+            <textarea placeholder="补充说明（选填）"></textarea>
+            <div class="rt-count">0 / 200</div>
+          </div>
+
+          <div class="report-submit">
+            <button class="btn-dark">提交举报</button>
+            <p class="report-note">提交后将由管理员核实处理，处理结果会在「消息通知」中告知</p>
+          </div>
+
+        </div>
+      </div></div>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ================= 五、我的 ================= -->
+<section class="group">
+  <h2>五、我的模块</h2>
+  <p class="desc">
+    个人资料卡片 + 功能列表：我的发布、我的收藏、消息通知、客服、设置。无「我的接单」，无管理入口。<br>
+    此处的「客服」是平台客服（咨询规则、反馈问题）；任务模块的「联系任务负责人」用于对接具体工作。
+  </p>
+  <div class="frames">
+
+    <figure class="frame">
+      <figcaption><span class="no">17</span>我的</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="title">我的</span></div>
+        <div class="content">
+          <div class="profile-card">
+            <div class="avatar"></div>
+            <div>
+              <div class="nick">李明</div>
+              <div class="uid">用户 ID：100238 · 2026-03-12 注册</div>
+            </div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="menu">
+            <div class="menu-item">我的发布<span class="arrow">›</span></div>
+            <div class="menu-item">我的收藏<span class="arrow">›</span></div>
+            <div class="menu-item">消息通知<span class="badge">2</span><span class="arrow">›</span></div>
+            <div class="menu-item">客服<span class="val">平台客服</span><span class="arrow">›</span></div>
+            <div class="menu-item">设置<span class="arrow">›</span></div>
+          </div>
+          <div class="divider"></div>
+          <p class="hint">App 端仅提供用户功能，所有管理操作在 Web 后台完成。</p>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16l-1.3 12.2a1.5 1.5 0 0 1-1.5 1.3H6.8a1.5 1.5 0 0 1-1.5-1.3L4 7Z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/></svg>交易</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>任务</div>
+          <div class="tab"><svg class="ico" viewBox="0 0 24 24"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L5 20l1.2-3.6A7.5 7.5 0 1 1 20 12Z"/></svg>论坛</div>
+          <div class="tab active"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>我的</div>
+        </div>
+      </div></div>
+    </figure>
+
+    <figure class="frame">
+      <figcaption><span class="no">18</span>消息通知（App 内消息中心）</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">消息通知</span></div>
+        <div class="content">
+          <div class="tabs"><span class="on">全部</span><span>系统</span><span>审核</span><span>互动</span></div>
+
+          <div class="msg">
+            <span class="dot"></span>
+            <div class="msg-body">
+              <div class="mt">审核结果</div>
+              <div class="md">你发布的「iPad Air 5 64G 深空灰」已通过审核，现已展示。</div>
+              <div class="mtime">10 分钟前</div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <span class="dot"></span>
+            <div class="msg-body">
+              <div class="mt">管理员回复</div>
+              <div class="md">关于你反馈的账号问题，已为你处理完成，请重新登录查看。</div>
+              <div class="mtime">1 小时前</div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <span class="dot read"></span>
+            <div class="msg-body">
+              <div class="mt">评论 / 回复提醒</div>
+              <div class="md">小林 回复了你的帖子：算我一个，装备齐全。</div>
+              <div class="mtime">2 小时前</div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <span class="dot read"></span>
+            <div class="msg-body">
+              <div class="mt">举报处理结果</div>
+              <div class="md">你提交的举报已处理完成，感谢你的反馈。</div>
+              <div class="mtime">昨天</div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <span class="dot read"></span>
+            <div class="msg-body">
+              <div class="mt">系统公告</div>
+              <div class="md">平台已上线「拉黑用户」功能，可在设置中查看与解除。</div>
+              <div class="mtime">3 天前</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </figure>
+
+    <!-- 客服聊天 -->
+    <figure class="frame">
+      <figcaption><span class="no">19</span>客服 · 平台客服</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">客服</span><span class="right">···</span></div>
+        <div class="chat-head">
+          <div class="avatar"></div>
+          <div class="who">平台客服<small>工作时间 9:00–18:00</small></div>
+          <span class="role">客服</span>
+        </div>
+        <div class="chat">
+          <div class="chat-time">今天 09:12</div>
+          <div class="bubble-row me">
+            <div class="bubble mine">你好，我发布的二手物品为什么还没通过审核？</div>
+          </div>
+          <div class="bubble-row">
+            <div class="bubble other">你好，审核会在 24 小时内完成，我帮你查一下具体进度。</div>
+          </div>
+          <div class="bubble-row">
+            <div class="bubble other">已核实，资料齐全，稍后会通过，请留意「我的发布」状态。</div>
+          </div>
+          <div class="bubble-row me">
+            <div class="bubble mine">好的，谢谢！</div>
+          </div>
+          <div class="chat-time">也可通过第三方方式联系客服</div>
+          <div class="quick-links">
+            <span class="pill" style="padding:6px 14px;font-size:11px">微信</span>
+            <span class="pill" style="padding:6px 14px;font-size:11px">QQ</span>
+            <span class="pill" style="padding:6px 14px;font-size:11px">电话</span>
+          </div>
+        </div>
+        <div class="inputbar">
+          <div class="fake-input">输入消息…</div>
+          <span style="font-size:12px;color:#111;font-weight:600">发送</span>
+        </div>
+      </div></div>
+    </figure>
+
+    <figure class="frame">
+      <figcaption><span class="no">20</span>设置页</figcaption>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span>5G ▮</span></div>
+        <div class="navbar"><span class="back">‹</span><span class="title">设置</span></div>
+        <div class="content">
+          <div class="menu" style="margin-top:8px">
+            <div class="menu-item">账号安全<span class="arrow">›</span></div>
+            <div class="menu-item">隐私政策<span class="arrow">›</span></div>
+            <div class="menu-item">用户协议<span class="arrow">›</span></div>
+            <div class="menu-item">黑名单管理<span class="arrow">›</span></div>
+            <div class="menu-item">清除缓存<span class="val">12.4 MB</span></div>
+            <div class="menu-item">关于我们<span class="arrow">›</span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="menu">
+            <div class="menu-item">退出登录<span class="arrow">›</span></div>
+            <div class="menu-item danger">注销账号<span class="arrow">›</span></div>
+          </div>
+          <p class="hint">注销说明：提交后 7 天内完成处理，处理期内该账号禁止登录与发布内容。此操作不可撤销。</p>
+        </div>
+      </div></div>
+    </figure>
+
+  </div>
+</section>
+
+<p class="footnote">
+  本次调整：登录页支持两种登录方式 Tab 切换——① 密码登录（手机号 + 密码，附「忘记密码」入口）→ ② 验证码登录（手机号 + 短信验证码，未注册手机号自动创建账号）。登录与注册入口分离：登录页底部“立即注册”跳转注册流程；注册①页底部“返回登录”可回到登录页。<br>
+  注册流程仍为三步：① 手机号验证（含短信限频提示）→ ② 设置密码（含密码强度条 + 规则校验）→ ③ 设置昵称（含头像上传与性别选填）。<br>
+  MVP 必埋 5 个事件：App 启动 · 页面访问 · 广告曝光 · 广告点击 · 发布行为（发布二手 / 帖子 / 评论成功）。<br>
+  日活口径 = 当日打开过 App 的去重用户数；自家看板统计自家广告位曝光 / 点击，广告收益以穿山甲 / 优量汇等平台后台报表为准。<br>
+  合规要点：隐私政策 · 用户协议 · 广告标识 · 内容审核 · 二手交易免责声明 · 备案与软著 · iOS ATT 授权。
+</p>
+
+</main>
+</body>
+</html>

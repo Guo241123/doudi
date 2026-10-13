@@ -1,0 +1,72 @@
+// 登录态 token 与用户信息本地存取（App token 30 天，见接口文档 1.3）
+
+const TOKEN_KEY = 'shequ_token'
+const USER_KEY = 'shequ_user'
+const REGISTER_TOKEN_KEY = 'shequ_register_token'
+// 登录/注册时用户输入的完整手机号（#10 只返回脱敏号，改密码发短信需完整号）
+const MOBILE_KEY = 'shequ_mobile'
+
+export function getToken() : string {
+	const v = uni.getStorageSync(TOKEN_KEY)
+	if (v == null) {
+		return ''
+	}
+	return v as string
+}
+
+export function setToken(token : string) {
+	uni.setStorageSync(TOKEN_KEY, token)
+}
+
+export function clearToken() {
+	uni.removeStorageSync(TOKEN_KEY)
+	uni.removeStorageSync(USER_KEY)
+	uni.removeStorageSync(MOBILE_KEY)
+}
+
+// 完整手机号：登录/注册成功时写入，改密码的短信方式发码需要
+export function setMobile(mobile : string) {
+	uni.setStorageSync(MOBILE_KEY, mobile)
+}
+
+export function getMobile() : string {
+	const v = uni.getStorageSync(MOBILE_KEY)
+	if (v == null) {
+		return ''
+	}
+	return v as string
+}
+
+export function isLogin() : boolean {
+	return getToken() != ''
+}
+
+// 用户对象（接口文档 1.7 User）
+export function setUser(user : UTSJSONObject) {
+	uni.setStorageSync(USER_KEY, user)
+}
+
+export function getUser() : UTSJSONObject | null {
+	const v = uni.getStorageSync(USER_KEY)
+	if (v == null) {
+		return null
+	}
+	return v as UTSJSONObject
+}
+
+// 注册流程凭证 registerToken（接口文档 #2 返回，注册②③凭它继续）
+export function setRegisterToken(token : string) {
+	uni.setStorageSync(REGISTER_TOKEN_KEY, token)
+}
+
+export function getRegisterToken() : string {
+	const v = uni.getStorageSync(REGISTER_TOKEN_KEY)
+	if (v == null) {
+		return ''
+	}
+	return v as string
+}
+
+export function clearRegisterToken() {
+	uni.removeStorageSync(REGISTER_TOKEN_KEY)
+}

@@ -1,0 +1,47 @@
+# 生产配置模板：所有密钥类配置一律用环境变量注入，本文件不入 Git / 不写真实值。
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+
+jwt:
+  secret: ${JWT_SECRET}
+
+oss:
+  endpoint: ${OSS_ENDPOINT}
+  bucket: ${OSS_BUCKET}
+  access-key-id: ${OSS_ACCESS_KEY_ID}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET}
+
+sms:
+  access-key-id: ${SMS_ACCESS_KEY_ID}
+  access-key-secret: ${SMS_ACCESS_KEY_SECRET}
+  sign-name: ${SMS_SIGN_NAME}
+
+content-safety:
+  enabled: true
+  access-key-id: ${CONTENT_SAFETY_ACCESS_KEY_ID}
+  access-key-secret: ${CONTENT_SAFETY_ACCESS_KEY_SECRET}
+
+# 二手交易：生产必须先审后发（需求 4.7.2），显式覆写 dev 的 auto-approve: true
+# （模块审查报告问题 2：不写这行就会带着"发布即上架"的演示开关上线）
+trade:
+  auto-approve: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.shequ: info

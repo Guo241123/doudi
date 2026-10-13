@@ -1,0 +1,338 @@
+<template>
+	<view class="page">
+		<nav-bar title="我的"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<view class="profile-card" @click="onProfile">
+				<image v-if="avatarUrl != ''" class="avatar" :src="avatarUrl" mode="aspectFill"></image>
+				<view v-else class="avatar"></view>
+				<view class="pc-body">
+					<text class="nick">{{ logged ? nickname : '登录 / 注册' }}</text>
+					<text class="uid">{{ logged ? uidText : '登录后可发布内容、收藏与管理资料' }}</text>
+				</view>
+				<text class="arrow">›</text>
+			</view>
+
+			<view class="menu">
+				<view class="menu-item" @click="onPosts">
+					<text class="mi-label">我的发布</text>
+					<text v-if="logged && postSummaryText != ''" class="mi-val">{{ postSummaryText }}</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onFavorites">
+					<text class="mi-label">我的收藏</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onMessage">
+					<text class="mi-label">消息通知</text>
+					<view v-if="logged && unreadCount > 0" class="badge"><text class="badge-text">{{ unreadCountText }}</text></view>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onContactAdmin">
+					<text class="mi-label">联系管理员</text>
+					<text class="arrow">›</text>
+				</view>
+				<view class="menu-item" @click="onSettings">
+					<text class="mi-label">设置</text>
+					<text class="arrow">›</text>
+				</view>
+			</view>
+
+			<view class="divider"></view>
+			<text class="hint">App 端仅提供用户功能，所有管理操作在 Web 后台完成。</text>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 我的（需求 4.5 / 原型 16）：个人资料卡 + 功能列表（发布 / 收藏 / 消息 / 联系管理员 / 设置）
+	// 数据来自《接口文档》#14 我的信息概览；游客可浏览，受保护操作触发登录
+	import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
+	import { isLogin, getUser } from '../../utils/token.uts'
+	import { getUserSummary } from '../../api/auth.uts'
+	import { getUnreadCount } from '../../api/message.uts'
+	import { trackPageView } from '../../utils/analytics.uts'
+
+
+
+	// 我的发布右侧统计：物品 x · 帖子 y（为 0 时不展示）
+
+	const logged = ref(false)
+
+	const nickname = ref('')
+
+	const uidText = ref('')
+
+	const avatarUrl = ref('')
+
+	const unreadCount = ref(0)
+
+	const myItemCount = ref(0)
+
+	const myPostCount = ref(0)
+
+	const unreadCountText = computed<string>(() : string => {
+		if (unreadCount.value > 99) {
+			return '99+'
+		}
+		return unreadCount.value.toString()
+	})
+
+	const postSummaryText = computed<string>(() : string => {
+		const item = myItemCount.value
+		const post = myPostCount.value
+		if (item == 0 && post == 0) {
+			return ''
+		}
+		if (item > 0 && post > 0) {
+			return '物品 ' + item.toString() + ' · 帖子 ' + post.toString()
+		}
+		if (item > 0) {
+			return '物品 ' + item.toString()
+		}
+		return '帖子 ' + post.toString()
+	})
+
+	let unreadTimer : number = -1
+
+
+	function buildUidText(id : number, registerTime : string) : string {
+		return '用户 ID：' + id.toString() + (registerTime == '' ? '' : ' · ' + registerTime + ' 注册')
+	}
+
+	function applyLocalUser() {
+		const u = getUser()
+		if (u == null) {
+			nickname.value = '用户'
+			uidText.value = '已登录'
+			return
+		}
+		nickname.value = u.getString('nickname') ?? '用户'
+		avatarUrl.value = u.getString('avatarUrl') ?? ''
+		uidText.value = buildUidText(u.getNumber('userId') ?? 0, u.getString('registerTime') ?? '')
+	}
+
+	function loadSummary() {
+		getUserSummary().then((data) => {
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				return
+			}
+			const u = o.getJSON('user')
+			if (u != null) {
+				nickname.value = u.getString('nickname') ?? nickname.value
+				avatarUrl.value = u.getString('avatarUrl') ?? ''
+				uidText.value = buildUidText(u.getNumber('userId') ?? 0, u.getString('registerTime') ?? '')
+			}
+			unreadCount.value = o.getNumber('unreadCount') ?? 0
+			myItemCount.value = o.getNumber('myItemCount') ?? 0
+			myPostCount.value = o.getNumber('myPostCount') ?? 0
+		}).catch((_) => {
+			// 概览失败不阻塞页面，保留本地缓存展示
+		})
+	}
+
+	function loadUnread() {
+		// #40 只查 Redis 计数器，代价极小
+		getUnreadCount().then((data) => {
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				return
+			}
+			unreadCount.value = o.getNumber('total') ?? 0
+		}).catch((_) => {
+			// 轮询失败静默，等下一轮
+		})
+	}
+
+	function startUnreadPoll() {
+		if (unreadTimer != -1) {
+			return
+		}
+		unreadTimer = setInterval(() => {
+			loadUnread()
+		}, 30000)
+	}
+
+	onShow(() => {
+		// #46 埋点：页面浏览
+		trackPageView('my/index')
+		logged.value = isLogin()
+		if (!logged.value) {
+			nickname.value = ''
+			uidText.value = ''
+			avatarUrl.value = ''
+			unreadCount.value = 0
+			myItemCount.value = 0
+			myPostCount.value = 0
+			return
+		}
+		// 先用本地缓存兜底，避免进页面闪空；再用 #14 刷新
+		applyLocalUser()
+		loadSummary()
+		startUnreadPoll()
+	})
+
+
+
+
+	function requireLogin() : boolean {
+		if (!logged.value) {
+			uni.navigateTo({ url: '/pages/login/index' })
+			return false
+		}
+		return true
+	}
+
+	function onProfile() {
+		if (!requireLogin()) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/my/profile' })
+	}
+
+	function onPosts() {
+		if (!requireLogin()) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/my/posts' })
+	}
+
+	function onFavorites() {
+		if (!requireLogin()) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/my/favorites' })
+	}
+
+	function onMessage() {
+		if (!requireLogin()) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/message/index' })
+	}
+
+	function onContactAdmin() {
+		uni.navigateTo({ url: '/pages/my/contact-admin' })
+	}
+
+	function onSettings() {
+		uni.navigateTo({ url: '/pages/my/settings' })
+	}
+
+	// ---- 未读数轮询（需求 3.6：前台 30s 一次，退后台停止）----
+
+
+
+	function stopUnreadPoll() {
+		if (unreadTimer != -1) {
+			clearInterval(unreadTimer)
+			unreadTimer = -1
+		}
+	}
+
+	onHide(() => {
+		stopUnreadPoll()
+	})
+
+	onUnload(() => {
+		stopUnreadPoll()
+	})
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.profile-card {
+		flex-direction: row;
+		align-items: center;
+		padding: 40rpx 32rpx;
+	}
+
+	.avatar {
+		width: 128rpx;
+		height: 128rpx;
+		border-radius: 64rpx;
+		background-color: #eaeaea;
+		overflow: hidden;
+	}
+
+	.pc-body {
+		flex: 1;
+		margin-left: 28rpx;
+	}
+
+	.nick {
+		font-size: 38rpx;
+		font-weight: 700;
+		color: #111111;
+	}
+
+	.uid {
+		font-size: 24rpx;
+		color: #999999;
+		margin-top: 12rpx;
+	}
+
+	.arrow {
+		font-size: 34rpx;
+		color: #cccccc;
+	}
+
+	.menu {
+		padding: 0 32rpx;
+	}
+
+	.menu-item {
+		flex-direction: row;
+		align-items: center;
+		padding: 32rpx 0;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.mi-label {
+		flex: 1;
+		font-size: 30rpx;
+		color: #222222;
+	}
+
+	.mi-val {
+		font-size: 26rpx;
+		color: #999999;
+		margin-right: 12rpx;
+	}
+
+	.badge {
+		background-color: #111111;
+		border-radius: 20rpx;
+		padding: 2rpx 14rpx;
+		margin-right: 12rpx;
+	}
+
+	.badge-text {
+		font-size: 22rpx;
+		color: #ffffff;
+	}
+
+	.divider {
+		height: 16rpx;
+		background-color: #f7f7f7;
+		margin-top: 20rpx;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+		padding: 28rpx 32rpx;
+	}
+</style>

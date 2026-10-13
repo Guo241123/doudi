@@ -1,0 +1,279 @@
+{
+  "total": 34,
+  "passed": 34,
+  "failed": 0,
+  "results": [
+    {
+      "module": "基础",
+      "case": "后端健康检查",
+      "expect": "code=0",
+      "actual": "code=0",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "准备",
+      "case": "注册买方/卖方",
+      "expect": "均拿到 token",
+      "actual": "B uid=122 S uid=123",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#36 买方发起 TRADE 会话",
+      "expect": "code=0 返回 {conversationId}",
+      "actual": "code=0 data={'conversationId': 17}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#38 新会话消息列表为空",
+      "expect": "code=0 且 list=[]",
+      "actual": "code=0 list=[]",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#39 买方发送消息",
+      "expect": "code=0 返回 messageId",
+      "actual": "code=0 data={'messageId': 16, 'createTime': '2026-10-12 10:38:41'}",
+      "ok": 16,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#40 买方未读（自己发的不计）",
+      "expect": "total=0",
+      "actual": "code=0 data={'total': 0, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 0, 'TRADE': 0}}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#37 卖方能看到会话且 peer=买方昵称",
+      "expect": "命中 cid 且 peer.nickname=链路买方",
+      "actual": "code=0 命中=True peer=链路买方",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#40 卖方未读 +1",
+      "expect": "total=1 且 byType.TRADE=1",
+      "actual": "code=0 data={'total': 1, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 0, 'TRADE': 1}}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#38 卖方读到买方的消息",
+      "expect": "1 条 senderId=买方 content 一致",
+      "actual": "code=0 条数=1",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#40 卖方进会话后未读清零",
+      "expect": "total=0",
+      "actual": "code=0 data={'total': 0, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 0, 'TRADE': 0}}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#39 卖方回复",
+      "expect": "code=0",
+      "actual": "code=0",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#40 买方未读 +1（读之前查）",
+      "expect": "total=1",
+      "actual": "code=0 data={'total': 1, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 0, 'TRADE': 1}}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#38 买方能看到卖方回复（双向）",
+      "expect": "2 条且含卖方回复",
+      "actual": "code=0 条数=2",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "#36 卖方反向发起复用同一会话",
+      "expect": "返回 17",
+      "actual": "code=0 conversationId=17",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "联系卖家",
+      "case": "越权：非会话成员读消息被拒",
+      "expect": "非 0（40401）",
+      "actual": "code=40401 msg=会话不存在",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "客服",
+      "case": "#36 发起 CUSTOMER 会话",
+      "expect": "code=0 返回 conversationId",
+      "actual": "code=0 data={'conversationId': 18}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "客服",
+      "case": "#39 用户发送消息",
+      "expect": "code=0",
+      "actual": "code=0",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "客服",
+      "case": "#37 会话列表 peer=管理员昵称",
+      "expect": "peer.nickname=社区管理员",
+      "actual": "code=0 peer=社区管理员",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "管理员登录",
+      "expect": "code=0 拿到 admin token",
+      "actual": "code=0",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "#55 会话列表（分页+user+未读）",
+      "expect": "命中 ccid 且 user.nickname=链路买方 且未读=1",
+      "actual": "code=0 total=7 命中=True user=链路买方 unread=1",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "#55 管理员查看会话消息",
+      "expect": "1 条且内容一致",
+      "actual": "code=0 条数=1",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "#55 管理员回复",
+      "expect": "code=0 返回 messageId",
+      "actual": "code=0 data={'messageId': 19, 'createTime': '2026-10-12 10:38:43'}",
+      "ok": 19,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "用户侧未读 +1（客服回复后）",
+      "expect": "total=1 且 byType.CUSTOMER=1",
+      "actual": "code=0 data={'total': 1, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 1, 'TRADE': 0}}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "客服闭环：用户能看到管理员回复",
+      "expect": "2 条且含管理员回复",
+      "actual": "code=0 条数=2",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "用户进会话后未读清零",
+      "expect": "total=0",
+      "actual": "code=0 data={'total': 0, 'byType': {'TASK_CONSULT': 0, 'CUSTOMER': 0, 'TRADE': 0}}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "#55 任务咨询优先排序",
+      "expect": "首条为 TASK_CONSULT（若存在任务会话）",
+      "actual": "首条 type=TASK_CONSULT 含任务会话=True",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "后台工作台",
+      "case": "越权：App token 调后台被拒",
+      "expect": "40101/40301",
+      "actual": "code=40301 msg=无权访问管理后台",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "任务咨询",
+      "case": "#36 发起任务会话（taskId=3）",
+      "expect": "code=0",
+      "actual": "code=0 data={'conversationId': 19} msg=ok",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "任务咨询",
+      "case": "#37 会话带 taskRef{taskId,title}",
+      "expect": "taskRef 有 taskId+title",
+      "actual": "code=0 taskRef={'taskId': 3, 'title': '社区活动摄影记录'}",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "任务咨询",
+      "case": "#39 发送消息",
+      "expect": "code=0",
+      "actual": "code=0",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "任务咨询",
+      "case": "#36 任务不存在应被拒",
+      "expect": "非 0（40401）",
+      "actual": "code=40401 msg=任务不存在或已删除",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "拉黑",
+      "case": "#43 买方拉黑卖方",
+      "expect": "code=0",
+      "actual": "code=0 msg=ok",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "拉黑",
+      "case": "#39 拉黑后发送被拒",
+      "expect": "40301",
+      "actual": "code=40301 msg=因拉黑关系，无法发送消息",
+      "ok": true,
+      "note": ""
+    },
+    {
+      "module": "拉黑",
+      "case": "#43 解除拉黑",
+      "expect": "code=0",
+      "actual": "code=0",
+      "ok": true,
+      "note": ""
+    }
+  ]
+}

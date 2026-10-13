@@ -1,0 +1,610 @@
+<template>
+	<view class="page">
+		<nav-bar title="我的发布" :show-back="true"></nav-bar>
+
+		<view class="tabs">
+			<text class="tab" :class="tab == 0 ? 'tab-on' : ''" @click="onTab(0)">二手物品</text>
+			<text class="tab" :class="tab == 1 ? 'tab-on' : ''" @click="onTab(1)">论坛帖子</text>
+		</view>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<template v-if="tab == 0">
+				<!-- 审核状态筛选（#23 auditStatus） -->
+				<scroll-view class="filters" :scroll-x="true">
+					<view class="filters-row">
+						<text
+							v-for="(f, i) in filters"
+							:key="i"
+							class="filter"
+							:class="filterIdx == i ? 'filter-on' : ''"
+							@click="onFilter(i)">{{ f.label }}</text>
+					</view>
+				</scroll-view>
+
+				<!-- 未登录 -->
+				<view v-if="!logged" class="state">
+					<text class="state-text">登录后可查看我的发布</text>
+					<view class="retry" @click="goLogin"><text class="retry-text">去登录</text></view>
+				</view>
+
+				<!-- 首屏加载中 -->
+				<view v-else-if="loading && items.length == 0" class="state">
+					<text class="state-text">加载中…</text>
+				</view>
+
+				<!-- 加载失败 -->
+				<view v-else-if="failed && items.length == 0" class="state">
+					<text class="state-text">加载失败，请检查网络后重试</text>
+					<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+				</view>
+
+				<!-- 空 -->
+				<view v-else-if="items.length == 0" class="state">
+					<text class="state-text">暂无发布</text>
+				</view>
+
+				<template v-else>
+					<view class="row-card" v-for="(it, i) in items" :key="it.id">
+						<view class="thumb" @click="onOpen(it.id)">
+							<image v-if="it.coverUrl != ''" class="thumb-img" :src="it.coverUrl" mode="aspectFill"></image>
+							<text v-else class="thumb-text">图片</text>
+						</view>
+						<view class="rc-body">
+							<text class="rc-title" @click="onOpen(it.id)">{{ it.title }}</text>
+							<view class="rc-price-row">
+								<text class="rc-price">¥{{ it.price }}</text>
+								<text class="tag" :class="it.tagOn ? 'tag-on' : 'tag-off'">{{ it.statusText }}</text>
+							</view>
+							<view class="rc-actions" v-if="it.actions.length > 0">
+								<text class="rc-action" v-for="(a, j) in it.actions" :key="j" @click="onAction(it, a)">{{ a }}</text>
+							</view>
+							<text v-if="it.rejectReason != ''" class="rc-reason">拒绝原因：{{ it.rejectReason }}</text>
+						</view>
+					</view>
+					<view class="foot">
+						<text v-if="loading" class="foot-text">加载中…</text>
+						<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+						<text v-else class="foot-text">上拉加载更多</text>
+					</view>
+				</template>
+			</template>
+
+			<!-- 论坛帖子 Tab：我发布的帖子（联调期新增接口 /forum/my-posts） -->
+			<template v-else>
+				<view v-if="postsLoading && posts.length == 0" class="state">
+					<text class="state-text">加载中…</text>
+				</view>
+				<view v-else-if="postsFailed && posts.length == 0" class="state">
+					<text class="state-text">加载失败，请检查网络后重试</text>
+					<view class="retry" @click="loadPosts(true)"><text class="retry-text">重新加载</text></view>
+				</view>
+				<view v-else-if="posts.length == 0" class="state">
+					<text class="state-text">暂无帖子</text>
+					<text class="state-text state-sub">可先在论坛首页发布帖子</text>
+				</view>
+				<template v-else>
+					<view class="row-card" v-for="(p, i) in posts" :key="p.id">
+						<view class="rc-body" @click="onOpenPost(p.id)">
+							<text class="rc-title">{{ p.content }}</text>
+							<view class="rc-price-row">
+								<text class="post-meta">赞 {{ p.likeCount }} · 评 {{ p.commentCount }}</text>
+								<text class="post-time">{{ p.timeText }}</text>
+							</view>
+						</view>
+					</view>
+					<view class="foot">
+						<text v-if="postsLoading" class="foot-text">加载中…</text>
+						<text v-else-if="!postsHasMore" class="foot-text">没有更多了</text>
+						<text v-else class="foot-text">上拉加载更多</text>
+					</view>
+				</template>
+			</template>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 我的发布（需求 4.2.5，原型 8）：二手物品列表 + 审核状态 + 编辑/下架/标记已售/重新上架
+	// 对接《接口文档》#23 我的发布、#22 卖家状态操作
+	import { onShow } from '@dcloudio/uni-app'
+	import { getMyItems, updateItemStatus } from '../../api/trade.uts'
+	import { getMyPosts } from '../../api/forum.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type MyPost = {
+		id : number
+		content : string
+		likeCount : number
+		commentCount : number
+		timeText : string
+	}
+
+	type MyItem = {
+		id : number
+		title : string
+		price : string
+		coverUrl : string
+		statusText : string
+		tagOn : boolean
+		rejectReason : string
+		actions : string[]
+	}
+
+	type Filter = {
+		label : string
+		value : string
+	}
+
+
+
+
+	const PAGE_SIZE = 20
+
+	const tab = ref(0)
+
+	const filters : Filter[] = [
+		{ label: '全部', value: '' },
+		{ label: '待审核', value: 'UNDER_REVIEW' },
+		{ label: '在售', value: 'ON_SALE' },
+		{ label: '已下架', value: 'OFF_SHELF' },
+		{ label: '已拒绝', value: 'REJECTED' }
+	]
+
+	const filterIdx = ref(0)
+
+	const logged = ref(true)
+
+	const items = ref<MyItem[]>([])
+
+	const cursor = ref(0)
+
+	const hasMore = ref(true)
+
+	const loading = ref(false)
+
+	const failed = ref(false)
+
+	const posts = ref<MyPost[]>([])
+
+	const postsCursor = ref(0)
+
+	const postsHasMore = ref(true)
+
+	const postsLoading = ref(false)
+
+	const postsFailed = ref(false)
+
+
+	function fenToYuan(fen : number) : string {
+		const yuan = Math.floor(fen / 100)
+		const cent = fen % 100
+		if (cent == 0) {
+			return '' + yuan
+		}
+		let cs = '' + cent
+		if (cent < 10) {
+			cs = '0' + cs
+		}
+		return yuan + '.' + cs
+	}
+
+	function statusLabel(status : string, auditStatus : string) : string {
+		if (status == 'SOLD') {
+			return '已售'
+		}
+		if (auditStatus == 'UNDER_REVIEW') {
+			return '待审核'
+		}
+		if (auditStatus == 'OFF_SHELF') {
+			return '已下架'
+		}
+		if (auditStatus == 'REJECTED') {
+			return '已拒绝'
+		}
+		return '在售'
+	}
+
+	function actionsFor(status : string, auditStatus : string) : string[] {
+		const arr : string[] = []
+		if (auditStatus == 'ON_SALE') {
+			if (status != 'SOLD') {
+				arr.push('编辑')
+				arr.push('下架')
+				arr.push('标记已售')
+			} else {
+				arr.push('编辑')
+			}
+		} else if (auditStatus == 'OFF_SHELF') {
+			arr.push('编辑')
+			arr.push('重新上架')
+		} else if (auditStatus == 'UNDER_REVIEW') {
+			arr.push('编辑')
+		} else if (auditStatus == 'REJECTED') {
+			arr.push('编辑')
+		}
+		return arr
+	}
+
+	function parseItem(o : UTSJSONObject) : MyItem {
+		const status = o.getString('status') ?? 'ON_SALE'
+		const auditStatus = o.getString('auditStatus') ?? 'ON_SALE'
+		const it : MyItem = {
+			id: o.getNumber('id') ?? 0,
+			title: o.getString('title') ?? '',
+			price: fenToYuan(o.getNumber('priceFen') ?? 0),
+			coverUrl: o.getString('coverUrl') ?? '',
+			statusText: statusLabel(status, auditStatus),
+			tagOn: auditStatus == 'ON_SALE' && status != 'SOLD',
+			rejectReason: o.getString('rejectReason') ?? '',
+			actions: actionsFor(status, auditStatus)
+		}
+		return it
+	}
+
+	function parsePost(o : UTSJSONObject) : MyPost {
+		const raw = o.getString('publishTime') ?? ''
+		return {
+			id: o.getNumber('id') ?? 0,
+			content: o.getString('content') ?? '',
+			likeCount: o.getNumber('likeCount') ?? 0,
+			commentCount: o.getNumber('commentCount') ?? 0,
+			timeText: raw.length >= 10 ? raw.substring(0, 10) : raw
+		}
+	}
+
+	function loadPosts(reset : boolean) {
+		if (postsLoading.value) {
+			return
+		}
+		if (reset) {
+			postsCursor.value = 0
+			postsHasMore.value = true
+			postsFailed.value = false
+			posts.value = []
+		}
+		if (!postsHasMore.value) {
+			return
+		}
+		postsLoading.value = true
+		getMyPosts(postsCursor.value, PAGE_SIZE).then((data) => {
+			postsLoading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				postsFailed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					posts.value.push(parsePost(list[i]))
+				}
+			}
+			postsCursor.value = o.getNumber('nextCursor') ?? 0
+			postsHasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			postsLoading.value = false
+			postsFailed.value = true
+		})
+	}
+
+	function loadMore(reset : boolean) {
+		if (!isLogin()) {
+			logged.value = false
+			return
+		}
+		logged.value = true
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			items.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getMyItems(cursor.value, PAGE_SIZE, filters[filterIdx.value].value).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					items.value.push(parseItem(list[i]))
+				}
+			}
+			cursor.value = o.getNumber('nextCursor') ?? 0
+			hasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onShow(() => {
+		if (tab.value == 0) {
+			loadMore(true)
+		} else if (tab.value == 1 && posts.value.length == 0) {
+			loadPosts(true)
+		}
+	})
+
+	function onTab(i : number) {
+		if (tab.value == i) {
+			return
+		}
+		tab.value = i
+		if (i == 0 && items.value.length == 0) {
+			loadMore(true)
+		}
+		if (i == 1 && posts.value.length == 0) {
+			loadPosts(true)
+		}
+	}
+
+	// ---- 帖子 tab（/forum/my-posts，游标分页同二手口径） ----
+
+
+
+	function onOpenPost(id : number) {
+		uni.navigateTo({ url: '/pages/forum/detail?id=' + id })
+	}
+
+	function onFilter(i : number) {
+		if (filterIdx.value == i) {
+			return
+		}
+		filterIdx.value = i
+		loadMore(true)
+	}
+
+	function reload() {
+		loadMore(true)
+	}
+
+
+	function onScrollLower() {
+		if (tab.value == 0) {
+			if (!loading.value && hasMore.value) {
+				loadMore(false)
+			}
+		} else if (!postsLoading.value && postsHasMore.value) {
+			loadPosts(false)
+		}
+	}
+
+	function goLogin() {
+		uni.navigateTo({ url: '/pages/login/index' })
+	}
+
+	function onOpen(id : number) {
+		uni.navigateTo({ url: '/pages/trade/detail?id=' + id })
+	}
+
+	function doStatus(id : number, action : string, msg : string) {
+		updateItemStatus(id, action).then((_) => {
+			uni.showToast({ title: msg, icon: 'none' })
+			loadMore(true)
+		}).catch((_) => {
+		})
+	}
+
+	function onAction(it : MyItem, label : string) {
+		if (label == '编辑') {
+			uni.navigateTo({ url: '/pages/trade/publish?id=' + it.id })
+		} else if (label == '下架') {
+			doStatus(it.id, 'OFF_SHELF', '已下架')
+		} else if (label == '标记已售') {
+			doStatus(it.id, 'MARK_SOLD', '已标记为已售')
+		} else if (label == '重新上架') {
+			doStatus(it.id, 'PUT_ON', '已重新上架，等待审核')
+		}
+	}
+
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.tabs {
+		flex-direction: row;
+		align-items: center;
+		padding: 0 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.tab {
+		font-size: 29rpx;
+		color: #999999;
+		padding: 26rpx 0;
+		margin-right: 48rpx;
+		border-bottom-width: 4rpx;
+		border-bottom-style: solid;
+		border-bottom-color: transparent;
+	}
+
+	.tab-on {
+		color: #111111;
+		font-weight: 600;
+		border-bottom-color: #111111;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.filters {
+		flex-direction: row;
+		padding: 20rpx 32rpx 8rpx 32rpx;
+	}
+
+	.filters-row {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.filter {
+		font-size: 25rpx;
+		color: #666666;
+		background-color: #f4f4f4;
+		border-radius: 999rpx;
+		padding: 10rpx 28rpx;
+		margin-right: 16rpx;
+	}
+
+	.filter-on {
+		color: #ffffff;
+		background-color: #111111;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 160rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.state-sub {
+		font-size: 24rpx;
+		color: #bbbbbb;
+		margin-top: 14rpx;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.row-card {
+		flex-direction: row;
+		padding: 24rpx 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.thumb {
+		width: 152rpx;
+		height: 152rpx;
+		border-radius: 18rpx;
+		background-color: #f2f2f2;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.thumb-img {
+		width: 152rpx;
+		height: 152rpx;
+	}
+
+	.thumb-text {
+		font-size: 24rpx;
+		color: #c9c9c9;
+	}
+
+	.rc-body {
+		flex: 1;
+		margin-left: 22rpx;
+	}
+
+	.rc-title {
+		font-size: 29rpx;
+		line-height: 42rpx;
+		color: #222222;
+	}
+
+	.rc-price-row {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 14rpx;
+	}
+
+	.rc-price {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #111111;
+	}
+
+	.tag {
+		font-size: 21rpx;
+		border-radius: 8rpx;
+		padding: 4rpx 12rpx;
+		margin-left: 18rpx;
+	}
+
+	.tag-on {
+		background-color: #111111;
+		color: #ffffff;
+	}
+
+	.tag-off {
+		background-color: #e8e8e8;
+		color: #9a9a9a;
+	}
+
+	.rc-actions {
+		flex-direction: row;
+		margin-top: 18rpx;
+	}
+
+	.rc-action {
+		font-size: 24rpx;
+		color: #999999;
+		margin-right: 28rpx;
+	}
+
+	.rc-reason {
+		font-size: 23rpx;
+		line-height: 36rpx;
+		color: #aaaaaa;
+		margin-top: 12rpx;
+	}
+
+	.post-meta {
+		font-size: 24rpx;
+		color: #888888;
+	}
+
+	.post-time {
+		font-size: 22rpx;
+		color: #bbbbbb;
+		margin-left: auto;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+</style>

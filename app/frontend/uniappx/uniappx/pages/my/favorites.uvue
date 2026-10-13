@@ -1,0 +1,453 @@
+<template>
+	<view class="page">
+		<nav-bar title="我的收藏" :show-back="true"></nav-bar>
+
+		<view class="tabs">
+			<text class="tab" :class="tab == 0 ? 'tab-on' : ''" @click="onTab(0)">二手物品</text>
+			<text class="tab" :class="tab == 1 ? 'tab-on' : ''" @click="onTab(1)">论坛帖子</text>
+		</view>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<template v-if="tab == 0">
+				<!-- 未登录 -->
+				<view v-if="!logged" class="state">
+					<text class="state-text">登录后可查看我的收藏</text>
+					<view class="retry" @click="goLogin"><text class="retry-text">去登录</text></view>
+				</view>
+
+				<!-- 首屏加载中 -->
+				<view v-else-if="loading && items.length == 0" class="state">
+					<text class="state-text">加载中…</text>
+				</view>
+
+				<!-- 加载失败 -->
+				<view v-else-if="failed && items.length == 0" class="state">
+					<text class="state-text">加载失败，请检查网络后重试</text>
+					<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+				</view>
+
+				<!-- 空 -->
+				<view v-else-if="items.length == 0" class="state">
+					<text class="state-text">还没有收藏的物品</text>
+				</view>
+
+				<template v-else>
+					<view class="item-grid">
+						<view class="item-wrap" v-for="(it, i) in items" :key="it.id">
+							<item-card
+								:title="it.title"
+								:price="it.price"
+								:sold="it.sold"
+								:cover-url="it.coverUrl"
+								:favorited="true"
+								:unavailable="it.unavailable"
+								:show-fav="true"
+								@select="onItem(it.id)"
+								@favorite="onFav(i)"></item-card>
+						</view>
+					</view>
+					<view class="foot">
+						<text v-if="loading" class="foot-text">加载中…</text>
+						<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+						<text v-else class="foot-text">上拉加载更多</text>
+					</view>
+				</template>
+			</template>
+
+			<!-- 论坛帖子 Tab：我收藏的帖子（联调期新增接口 /forum/my-favorites，原帖不可见时置灰） -->
+			<template v-else>
+				<view v-if="postsLoading && posts.length == 0" class="state">
+					<text class="state-text">加载中…</text>
+				</view>
+				<view v-else-if="postsFailed && posts.length == 0" class="state">
+					<text class="state-text">加载失败，请检查网络后重试</text>
+					<view class="retry" @click="loadPosts(true)"><text class="retry-text">重新加载</text></view>
+				</view>
+				<view v-else-if="posts.length == 0" class="state">
+					<text class="state-text">还没有收藏的帖子</text>
+					<text class="state-text state-sub">可在帖子详情页收藏帖子</text>
+				</view>
+				<template v-else>
+					<view class="row-card" v-for="(p, i) in posts" :key="p.id">
+						<view class="rc-body" @click="onOpenPost(p)">
+							<text class="post-title" :class="p.unavailable ? 'post-off' : ''">{{ p.content }}</text>
+							<view class="rc-price-row">
+								<text class="post-meta">赞 {{ p.likeCount }} · 评 {{ p.commentCount }}</text>
+								<text v-if="p.unavailable" class="post-gone">原帖已删除</text>
+							</view>
+						</view>
+					</view>
+					<view class="foot">
+						<text v-if="postsLoading" class="foot-text">加载中…</text>
+						<text v-else-if="!postsHasMore" class="foot-text">没有更多了</text>
+						<text v-else class="foot-text">上拉加载更多</text>
+					</view>
+				</template>
+			</template>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 我的收藏（需求 4.2.6）：二手物品列表（已售/下架置灰）+ 取消收藏
+	// 对接《接口文档》#25 我的收藏、#24 取消收藏
+	import { onShow } from '@dcloudio/uni-app'
+	import { getFavoriteItems, unfavoriteItem } from '../../api/trade.uts'
+	import { getMyFavoritePosts } from '../../api/forum.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type MyPost = {
+		id : number
+		content : string
+		likeCount : number
+		commentCount : number
+		unavailable : boolean
+	}
+
+	type TradeItem = {
+		id : number
+		title : string
+		price : string
+		sold : boolean
+		coverUrl : string
+		unavailable : boolean
+	}
+
+
+
+	const PAGE_SIZE = 20
+
+	const tab = ref(0)
+
+	const logged = ref(true)
+
+	const items = ref<TradeItem[]>([])
+
+	const cursor = ref(0)
+
+	const hasMore = ref(true)
+
+	const loading = ref(false)
+
+	const failed = ref(false)
+
+	const posts = ref<MyPost[]>([])
+
+	const postsCursor = ref(0)
+
+	const postsHasMore = ref(true)
+
+	const postsLoading = ref(false)
+
+	const postsFailed = ref(false)
+
+
+	function fenToYuan(fen : number) : string {
+		const yuan = Math.floor(fen / 100)
+		const cent = fen % 100
+		if (cent == 0) {
+			return '' + yuan
+		}
+		let cs = '' + cent
+		if (cent < 10) {
+			cs = '0' + cs
+		}
+		return yuan + '.' + cs
+	}
+
+	function parseItem(o : UTSJSONObject) : TradeItem {
+		const status = o.getString('status') ?? 'ON_SALE'
+		const it : TradeItem = {
+			id: o.getNumber('id') ?? 0,
+			title: o.getString('title') ?? '',
+			price: fenToYuan(o.getNumber('priceFen') ?? 0),
+			sold: status == 'SOLD',
+			coverUrl: o.getString('coverUrl') ?? '',
+			unavailable: o.getBoolean('unavailable') ?? false
+		}
+		return it
+	}
+
+	function loadPosts(reset : boolean) {
+		if (postsLoading.value) {
+			return
+		}
+		if (reset) {
+			postsCursor.value = 0
+			postsHasMore.value = true
+			postsFailed.value = false
+			posts.value = []
+		}
+		if (!postsHasMore.value) {
+			return
+		}
+		postsLoading.value = true
+		getMyFavoritePosts(postsCursor.value, PAGE_SIZE).then((data) => {
+			postsLoading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				postsFailed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					const it = list[i]
+					const p : MyPost = {
+						id: it.getNumber('id') ?? 0,
+						content: it.getString('content') ?? '',
+						likeCount: it.getNumber('likeCount') ?? 0,
+						commentCount: it.getNumber('commentCount') ?? 0,
+						unavailable: it.getBoolean('unavailable') ?? false
+					}
+					posts.value.push(p)
+				}
+			}
+			postsCursor.value = o.getNumber('nextCursor') ?? 0
+			postsHasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			postsLoading.value = false
+			postsFailed.value = true
+		})
+	}
+
+	function loadMore(reset : boolean) {
+		if (!isLogin()) {
+			logged.value = false
+			return
+		}
+		logged.value = true
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			items.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getFavoriteItems(cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					items.value.push(parseItem(list[i]))
+				}
+			}
+			cursor.value = o.getNumber('nextCursor') ?? 0
+			hasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onShow(() => {
+		if (tab.value == 0) {
+			loadMore(true)
+		} else if (tab.value == 1 && posts.value.length == 0) {
+			loadPosts(true)
+		}
+	})
+
+	function onTab(i : number) {
+		if (tab.value == i) {
+			return
+		}
+		tab.value = i
+		if (i == 0 && items.value.length == 0) {
+			loadMore(true)
+		}
+		if (i == 1 && posts.value.length == 0) {
+			loadPosts(true)
+		}
+	}
+
+	// ---- 帖子 tab（/forum/my-favorites，游标按收藏记录 id 翻页） ----
+
+
+	function onOpenPost(p : MyPost) {
+		if (p.unavailable) {
+			uni.showToast({ title: '原帖已删除或不可见', icon: 'none' })
+			return
+		}
+		uni.navigateTo({ url: '/pages/forum/detail?id=' + p.id })
+	}
+
+	function reload() {
+		loadMore(true)
+	}
+
+
+	function onScrollLower() {
+		if (tab.value == 0) {
+			if (!loading.value && hasMore.value) {
+				loadMore(false)
+			}
+		} else if (!postsLoading.value && postsHasMore.value) {
+			loadPosts(false)
+		}
+	}
+
+	function goLogin() {
+		uni.navigateTo({ url: '/pages/login/index' })
+	}
+
+	function onItem(id : number) {
+		uni.navigateTo({ url: '/pages/trade/detail?id=' + id })
+	}
+
+	// 取消收藏（#24 幂等）后从列表移除
+	function onFav(index : number) {
+		const it = items.value[index]
+		unfavoriteItem(it.id).then((_) => {
+			const arr : TradeItem[] = []
+			for (let i = 0; i < items.value.length; i++) {
+				if (i != index) {
+					arr.push(items.value[i])
+				}
+			}
+			items.value = arr
+			uni.showToast({ title: '已取消收藏', icon: 'none' })
+		}).catch((_) => {
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.tabs {
+		flex-direction: row;
+		align-items: center;
+		padding: 0 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.tab {
+		font-size: 29rpx;
+		color: #999999;
+		padding: 26rpx 0;
+		margin-right: 48rpx;
+		border-bottom-width: 4rpx;
+		border-bottom-style: solid;
+		border-bottom-color: transparent;
+	}
+
+	.tab-on {
+		color: #111111;
+		font-weight: 600;
+		border-bottom-color: #111111;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 160rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.state-sub {
+		font-size: 24rpx;
+		color: #bbbbbb;
+		margin-top: 14rpx;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.item-grid {
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		padding: 28rpx;
+	}
+
+	.item-wrap {
+		width: 48.5%;
+		margin-bottom: 20rpx;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+
+	.row-card {
+		padding: 26rpx 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.rc-body {
+		flex: 1;
+	}
+
+	.post-title {
+		font-size: 29rpx;
+		line-height: 42rpx;
+		color: #222222;
+	}
+
+	.post-off {
+		color: #bbbbbb;
+	}
+
+	.rc-price-row {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 14rpx;
+	}
+
+	.post-meta {
+		font-size: 24rpx;
+		color: #888888;
+	}
+
+	.post-gone {
+		font-size: 22rpx;
+		color: #c07a7a;
+		margin-left: auto;
+	}
+</style>

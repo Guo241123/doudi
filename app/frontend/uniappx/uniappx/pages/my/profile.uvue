@@ -1,0 +1,262 @@
+<template>
+	<view class="page">
+		<nav-bar title="个人资料" :show-back="true" right-text="保存" @right="onSave"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true">
+			<view class="avatar-row" @click="onPickAvatar">
+				<image v-if="avatarUrl != ''" class="avatar" :src="avatarUrl" mode="aspectFill"></image>
+				<view v-else class="avatar"><text class="avatar-plus">+</text></view>
+				<text class="avatar-tip">点击更换头像</text>
+			</view>
+
+			<view class="frow">
+				<text class="frow-label">昵称</text>
+				<input class="frow-input" placeholder="设置昵称（1～12 字）" placeholder-class="ph" v-model="nickname" maxlength="12" />
+				<text class="frow-count">{{ nickname.length }} / 12</text>
+			</view>
+
+			<view class="frow" @click="onPickGender">
+				<text class="frow-label">性别</text>
+				<text class="frow-pick">{{ genderText }}</text>
+				<text class="frow-arrow">›</text>
+			</view>
+
+			<view class="frow frow-top">
+				<text class="frow-label">简介</text>
+				<textarea class="frow-area" placeholder="介绍一下自己（选填，最多 100 字）" placeholder-class="ph" v-model="bio" maxlength="100" />
+			</view>
+
+			<text class="hint">{{ uidText }}</text>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 个人资料：头像 / 昵称 / 性别 / 简介
+	// 回填对接《接口文档》#10 我的资料，保存对接 #11 编辑资料，头像走 #26 直传
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getProfile, updateProfile } from '../../api/auth.uts'
+	import { uploadLocalFile } from '../../api/upload.uts'
+	import { getUser, setUser } from '../../utils/token.uts'
+
+	const nickname = ref('')
+	const bio = ref('')
+	const gender = ref('U')
+	const avatarUrl = ref('')
+	const avatarKey = ref('')
+	const uidText = ref('')
+	const saving = ref(false)
+
+	const genderText = computed<string>(() : string => {
+		if (gender.value == 'M') {
+			return '男'
+		}
+		if (gender.value == 'F') {
+			return '女'
+		}
+		return '保密'
+	})
+
+	onLoad((_) => {
+		getProfile().then((data) => {
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				return
+			}
+			nickname.value = o.getString('nickname') ?? ''
+			gender.value = o.getString('gender') ?? 'U'
+			bio.value = o.getString('bio') ?? ''
+			avatarUrl.value = o.getString('avatarUrl') ?? ''
+			const id = o.getNumber('userId') ?? 0
+			const rt = o.getString('registerTime') ?? ''
+			uidText.value = '用户 ID：' + id.toString() + (rt == '' ? '' : ' · 注册于 ' + rt)
+		}).catch((_) => {
+		})
+	})
+
+	function onPickAvatar() {
+		uni.chooseImage({
+			count: 1,
+			success: (res) => {
+				const paths = res.tempFilePaths
+				if (paths.length == 0) {
+					return
+				}
+				const path = paths[0]
+				uni.showLoading({ title: '上传中', mask: true })
+				uploadLocalFile(path, 'IMAGE', 'AVATAR').then((key) => {
+					uni.hideLoading()
+					avatarKey.value = key
+					avatarUrl.value = path
+					uni.showToast({ title: '头像已上传，保存后生效', icon: 'none' })
+				}).catch((_) => {
+					uni.hideLoading()
+				})
+			}
+		})
+	}
+
+	function onPickGender() {
+		uni.showActionSheet({
+			itemList: ['男', '女', '保密'],
+			success: (res) => {
+				if (res.tapIndex == 0) {
+					gender.value = 'M'
+				} else if (res.tapIndex == 1) {
+					gender.value = 'F'
+				} else {
+					gender.value = 'U'
+				}
+			}
+		})
+	}
+
+	// 同步本地缓存，返回「我的」页即时生效
+	function syncLocalUser(d : UTSJSONObject | null) {
+		if (d == null) {
+			return
+		}
+		const u = getUser()
+		if (u == null) {
+			return
+		}
+		u['nickname'] = d.getString('nickname') ?? u.getString('nickname') ?? ''
+		u['avatarUrl'] = d.getString('avatarUrl') ?? ''
+		u['gender'] = d.getString('gender') ?? u.getString('gender') ?? 'U'
+		u['bio'] = d.getString('bio') ?? ''
+		setUser(u)
+	}
+
+	function onSave() {
+		if (saving.value) {
+			return
+		}
+		const nick = nickname.value.trim()
+		if (nick == '') {
+			uni.showToast({ title: '昵称不能为空', icon: 'none' })
+			return
+		}
+
+		saving.value = true
+		const payload = {} as UTSJSONObject
+		payload['nickname'] = nick
+		payload['gender'] = gender.value
+		payload['bio'] = bio.value
+		if (avatarKey.value != '') {
+			payload['avatarKey'] = avatarKey.value
+		}
+
+		uni.showLoading({ title: '保存中', mask: true })
+		updateProfile(payload).then((data) => {
+			uni.hideLoading()
+			saving.value = false
+			syncLocalUser(data as UTSJSONObject | null)
+			uni.showToast({ title: '已保存', icon: 'none' })
+			setTimeout(() => {
+				uni.navigateBack()
+			}, 600)
+		}).catch((_) => {
+			uni.hideLoading()
+			saving.value = false
+		})
+	}
+
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.avatar-row {
+		flex-direction: column;
+		align-items: center;
+		padding: 48rpx 0 32rpx 0;
+	}
+
+	.avatar {
+		width: 152rpx;
+		height: 152rpx;
+		border-radius: 76rpx;
+		background-color: #f2f2f2;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.avatar-plus {
+		font-size: 56rpx;
+		font-weight: 300;
+		color: #c2c2c2;
+	}
+
+	.avatar-tip {
+		font-size: 24rpx;
+		color: #aaaaaa;
+		margin-top: 18rpx;
+	}
+
+	.frow {
+		flex-direction: row;
+		align-items: center;
+		padding: 28rpx 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.frow-top {
+		align-items: flex-start;
+	}
+
+	.frow-label {
+		width: 140rpx;
+		font-size: 29rpx;
+		color: #333333;
+	}
+
+	.frow-input {
+		flex: 1;
+		font-size: 29rpx;
+		color: #111111;
+	}
+
+	.frow-count {
+		font-size: 23rpx;
+		color: #c2c2c2;
+	}
+
+	.frow-pick {
+		flex: 1;
+		font-size: 29rpx;
+		color: #333333;
+	}
+
+	.frow-arrow {
+		font-size: 32rpx;
+		color: #cccccc;
+	}
+
+	.frow-area {
+		flex: 1;
+		height: 120rpx;
+		font-size: 29rpx;
+		color: #111111;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 29rpx;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		color: #aaaaaa;
+		padding: 28rpx 32rpx;
+	}
+</style>

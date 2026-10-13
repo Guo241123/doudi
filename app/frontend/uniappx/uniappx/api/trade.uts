@@ -1,0 +1,61 @@
+// 交易（二手）模块接口（对应《接口文档》2.3）
+// 只读列表/详情由页面自行渲染「加载中 / 失败重试 / 空」状态，故 manual=true 关闭统一 toast
+
+import { request } from './request.uts'
+
+// #17 分类列表
+export function getCategories() : Promise<any> {
+	return request({ url: '/trade/categories', method: 'GET', auth: false, manual: true })
+}
+
+// #18 物品列表（categoryId<=0 表示全部，不传该参数）
+export function getItemList(categoryId : number, cursor : number, size : number) : Promise<any> {
+	let url = '/trade/items?cursor=' + cursor + '&size=' + size
+	if (categoryId > 0) {
+		url = url + '&categoryId=' + categoryId
+	}
+	return request({ url: url, method: 'GET', auth: false, manual: true })
+}
+
+// #19 物品详情（不含联系方式；canChat 决定是否显示「联系卖家」）
+export function getItemDetail(id : number) : Promise<any> {
+	return request({ url: '/trade/items/' + id, method: 'GET', manual: true })
+}
+
+// #20 发布二手
+export function publishItem(data : any) : Promise<any> {
+	return request({ url: '/trade/items', method: 'POST', data: data, manual: true })
+}
+
+// #21 编辑二手（仅本人；编辑后回到 UNDER_REVIEW）
+export function updateItem(id : number, data : any) : Promise<any> {
+	return request({ url: '/trade/items/' + id, method: 'PUT', data: data, manual: true })
+}
+
+// #22 卖家状态操作 action: OFF_SHELF 下架 / MARK_SOLD 标记已售 / PUT_ON 重新上架
+export function updateItemStatus(id : number, action : string) : Promise<any> {
+	return request({ url: '/trade/items/' + id + '/status', method: 'PUT', data: { action: action } })
+}
+
+// #23 我的发布（二手）auditStatus 可选：UNDER_REVIEW/ON_SALE/REJECTED/OFF_SHELF
+export function getMyItems(cursor : number, size : number, auditStatus : string) : Promise<any> {
+	let url = '/trade/my-items?cursor=' + cursor + '&size=' + size
+	if (auditStatus != '') {
+		url = url + '&auditStatus=' + auditStatus
+	}
+	return request({ url: url, method: 'GET', manual: true })
+}
+
+// #24 收藏 / 取消收藏（幂等；未登录返回 40101 由统一封装跳登录）
+export function favoriteItem(id : number) : Promise<any> {
+	return request({ url: '/trade/items/' + id + '/favorite', method: 'POST' })
+}
+
+export function unfavoriteItem(id : number) : Promise<any> {
+	return request({ url: '/trade/items/' + id + '/favorite', method: 'DELETE' })
+}
+
+// #25 我的收藏（二手）；已售/下架物品仍返回并带 unavailable=true
+export function getFavoriteItems(cursor : number, size : number) : Promise<any> {
+	return request({ url: '/trade/favorites?cursor=' + cursor + '&size=' + size, method: 'GET', manual: true })
+}

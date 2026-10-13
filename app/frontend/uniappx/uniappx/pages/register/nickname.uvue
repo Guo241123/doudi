@@ -1,0 +1,258 @@
+<template>
+	<view class="page">
+		<nav-bar title="设置昵称"></nav-bar>
+		<view class="reg">
+			<view class="reg-head">
+				<text class="reg-h3">完善你的资料</text>
+				<text class="reg-p">昵称将展示在论坛、二手与任务等场景</text>
+			</view>
+
+			<step-bar :steps="steps" :current="3"></step-bar>
+
+			<view class="avatar-picker">
+				<view class="av">
+					<svg-icon name="plus" :size="48"></svg-icon>
+				</view>
+				<text class="av-tip">头像（选填）可在注册后于「我的-编辑资料」设置</text>
+			</view>
+
+			<view class="field">
+				<input class="field-input" placeholder="设置昵称（1～12 字）" placeholder-class="ph" v-model="nickname" :maxlength="12" />
+				<text class="nick-count">{{ nickname.length }} / 12</text>
+			</view>
+
+			<view class="frow" @click="onGender">
+				<text class="frow-label">性别</text>
+				<text class="frow-value-dark">{{ gender }}</text>
+				<svg-icon name="chevron" :size="28"></svg-icon>
+			</view>
+
+			<view class="btn-dark" :class="submitting ? 'btn-disabled' : ''" @click="onFinish">
+				<text class="btn-dark-text">{{ submitting ? '提交中…' : '完成注册' }}</text>
+			</view>
+			<text class="reg-tip-center">注册即表示同意接收审核结果等 App 内消息通知</text>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 注册③（原型 4，需求文档 4.1.1）：昵称 + 性别，完成即登录，对接《接口文档》#4
+	import { registerNickname } from '../../api/auth.uts'
+	import { errorCode, errorMessage } from '../../api/request.uts'
+	import { getRegisterToken, clearRegisterToken, setToken, setUser } from '../../utils/token.uts'
+	import { isNickname } from '../../utils/validate.uts'
+
+	const steps = ref<string[]>(['手机号', '密码', '昵称'])
+	const nickname = ref('')
+	const gender = ref('男')
+	const submitting = ref(false)
+
+	// 界面文案 → 接口枚举
+	function genderCode() : string {
+		const g = gender.value
+		if (g == '男') {
+			return 'M'
+		}
+		if (g == '女') {
+			return 'F'
+		}
+		return 'U'
+	}
+
+	function onGender() {
+		uni.showActionSheet({
+			itemList: ['男', '女', '保密'],
+			success: (res) => {
+				const list = ['男', '女', '保密']
+				gender.value = list[res.tapIndex]
+			}
+		})
+	}
+
+	function onFinish() {
+		if (submitting.value) {
+			return
+		}
+		if (!isNickname(nickname.value)) {
+			uni.showToast({ title: '昵称需 1～12 字', icon: 'none' })
+			return
+		}
+		const rt = getRegisterToken()
+		if (rt == '') {
+			uni.showModal({
+				title: '提示',
+				content: '注册信息已失效，请重新验证手机号',
+				showCancel: false,
+				success: (_) => {
+					uni.reLaunch({ url: '/pages/login/index' })
+				}
+			})
+			return
+		}
+		submitting.value = true
+		registerNickname(rt, nickname.value.trim(), genderCode(), '').then((data) => {
+			submitting.value = false
+			const obj = data as UTSJSONObject | null
+			const token = obj == null ? '' : (obj.getString('token') ?? '')
+			if (token == '') {
+				uni.showToast({ title: '注册失败，请重试', icon: 'none' })
+				return
+			}
+			setToken(token)
+			const user = obj == null ? null : (obj['user'] as UTSJSONObject | null)
+			if (user != null) {
+				setUser(user)
+			}
+			clearRegisterToken()
+			uni.showToast({ title: '注册成功', icon: 'none' })
+			uni.switchTab({ url: '/pages/trade/index' })
+		}).catch((e) => {
+			submitting.value = false
+			const code = errorCode(e)
+			const msg = errorMessage(e)
+			if (code == 40002) {
+				clearRegisterToken()
+				uni.showModal({
+					title: '提示',
+					content: '注册信息已失效，请重新验证手机号',
+					showCancel: false,
+					success: (_) => {
+						uni.reLaunch({ url: '/pages/login/index' })
+					}
+				})
+			} else {
+				uni.showToast({ title: msg, icon: 'none' })
+			}
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.reg {
+		flex: 1;
+		flex-direction: column;
+		padding: 70rpx 60rpx 60rpx 60rpx;
+	}
+
+	.reg-head {
+		flex-direction: column;
+		margin-bottom: 60rpx;
+	}
+
+	.reg-h3 {
+		font-size: 45rpx;
+		font-weight: 700;
+		color: #111111;
+	}
+
+	.reg-p {
+		font-size: 27rpx;
+		color: #aaaaaa;
+		line-height: 42rpx;
+		margin-top: 16rpx;
+	}
+
+	.avatar-picker {
+		flex-direction: column;
+		align-items: center;
+		margin: 14rpx 0 52rpx 0;
+	}
+
+	.av {
+		width: 178rpx;
+		height: 178rpx;
+		border-radius: 89rpx;
+		background-color: #f2f2f2;
+		border-width: 1px;
+		border-style: dashed;
+		border-color: #d8d8d8;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.av-tip {
+		font-size: 24rpx;
+		color: #b5b5b5;
+		margin-top: 24rpx;
+	}
+
+	.field {
+		flex-direction: row;
+		align-items: center;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+		padding: 33rpx 0;
+		margin-top: 14rpx;
+	}
+
+	.field-input {
+		flex: 1;
+		font-size: 30rpx;
+		color: #111111;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 30rpx;
+	}
+
+	.nick-count {
+		font-size: 22rpx;
+		color: #c4c4c4;
+		align-self: flex-end;
+		padding-bottom: 12rpx;
+	}
+
+	.frow {
+		flex-direction: row;
+		align-items: center;
+		padding: 33rpx 0;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.frow-label {
+		font-size: 29rpx;
+		color: #666666;
+	}
+
+	.frow-value-dark {
+		font-size: 29rpx;
+		color: #333333;
+		margin-left: auto;
+		margin-right: 12rpx;
+	}
+
+	.btn-dark {
+		background-color: #111111;
+		border-radius: 22rpx;
+		padding: 33rpx;
+		align-items: center;
+		margin-top: 60rpx;
+	}
+
+	.btn-disabled {
+		opacity: 0.6;
+	}
+
+	.btn-dark-text {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.reg-tip-center {
+		font-size: 26rpx;
+		color: #a5a5a5;
+		line-height: 44rpx;
+		text-align: center;
+		margin-top: 24rpx;
+	}
+</style>

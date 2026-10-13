@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>社区 App 前端功能完善度测试报告</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#16181d; --sub:#5b6270; --line:#e6e8ec;
+    --p0:#d92d20; --p0bg:#fef3f2; --p1:#dc6803; --p1bg:#fffaeb; --p2:#1570ef; --p2bg:#eff8ff;
+    --ok:#067647; --okbg:#ecfdf3; --warn:#b54708; --warnbg:#fffaeb; --bad:#b42318; --badbg:#fef3f2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.65;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:2px solid var(--ink);padding-bottom:20px;margin-bottom:28px}
+  h1{font-size:27px;margin:0 0 8px;letter-spacing:-.3px}
+  .meta{color:var(--sub);font-size:13.5px}
+  .verdict{display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+    background:var(--badbg);color:var(--bad);border:1px solid #fecdca;
+    padding:6px 14px;border-radius:999px;font-weight:600;font-size:14px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:26px 0 34px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .kpi .n{font-size:26px;font-weight:700;letter-spacing:-.5px}
+  .kpi .l{font-size:12.5px;color:var(--sub);margin-top:2px}
+  .kpi.bad .n{color:var(--p0)} .kpi.good .n{color:var(--ok)} .kpi.warnk .n{color:var(--p1)}
+  h2{font-size:19px;margin:44px 0 14px;padding-left:12px;border-left:4px solid var(--ink)}
+  h3{font-size:15.5px;margin:22px 0 8px}
+  p{margin:8px 0}
+  .lede{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:8px}
+  .lede b{color:var(--p0)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+    border-radius:12px;overflow:hidden;font-size:13.5px}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#fafbfc;font-weight:600;color:#3b4252;font-size:12.5px;letter-spacing:.2px}
+  tr:last-child td{border-bottom:none}
+  .tag{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .t-ok{background:var(--okbg);color:var(--ok)}
+  .t-warn{background:var(--warnbg);color:var(--warn)}
+  .t-bad{background:var(--badbg);color:var(--bad)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:12px 0}
+  .card.p0{border-left:4px solid var(--p0)}
+  .card.p1{border-left:4px solid var(--p1)}
+  .card.p2{border-left:4px solid var(--p2)}
+  .card h3{margin:0 0 6px;font-size:15.5px;display:flex;gap:9px;align-items:baseline}
+  .badge{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:6px;flex:none}
+  .b0{background:var(--p0bg);color:var(--p0)} .b1{background:var(--p1bg);color:var(--p1)} .b2{background:var(--p2bg);color:var(--p2)}
+  .card p{margin:6px 0;font-size:14px}
+  .card .why{color:var(--sub)}
+  code{background:#f2f4f7;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px;color:#344054}
+  .ok-line{color:var(--ok);font-weight:600}
+  .bad-line{color:var(--p0);font-weight:600}
+  ol.steps{padding-left:22px} ol.steps>li{margin:10px 0}
+  .foot{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--sub);font-size:13px}
+  .note{font-size:13px;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>社区 App · 前端页面功能完善度测试报告</h1>
+  <div class="meta">API Tester ｜ 2026-10-10 ｜ 需求文档 V1.4.1 ｜ 后端 Spring Boot 3 + MySQL 8 + Redis 7 ｜ 前端 uni-app X（27 页）<br/>
+  方法：静态契约比对 + 真实接口联调（后端 127.0.0.1:8080 在线，MySQL/Redis 均在线）</div>
+  <div class="verdict">⛔ 质量状态 FAIL · 放行建议 NO-GO</div>
+</header>
+
+<div class="lede">
+  <p><b>一句话结论：</b>账号、交易浏览、任务、论坛浏览、举报、收藏这些<strong>读操作功能基本完善</strong>；
+  但所有<strong>写入类功能存在硬伤</strong>——上传接口没写、发布因此必然失败、发评论 100% 失败、站内信整块是假数据。</p>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="n">27</div><div class="l">前端页面（1 个死代码）</div></div>
+  <div class="kpi good"><div class="n">42/43</div><div class="l">后端已实现接口</div></div>
+  <div class="kpi bad"><div class="n">1</div><div class="l">后端缺失接口 /upload/token</div></div>
+  <div class="kpi good"><div class="n">72/74</div><div class="l">联调用例通过</div></div>
+  <div class="kpi bad"><div class="n">8</div><div class="l">存在缺陷的页面</div></div>
+  <div class="kpi warnk"><div class="n">4</div><div class="l">核心功能完全不可用</div></div>
+</div>
+
+<h2>一、页面功能完善度总表</h2>
+<table>
+<thead><tr><th style="width:38px">#</th><th style="width:150px">页面</th><th>主要功能</th><th style="width:120px">依赖接口</th><th style="width:72px">状态</th><th>问题</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>login/index</td><td>图形验证码 / 密码登录 / 短信登录 / 游客浏览</td><td>#0 #1 #5 #6</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>2</td><td>login/forgot</td><td>忘记密码重置</td><td>#0 #1 #7</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>3</td><td>register/mobile</td><td>注册①校验手机号</td><td>#0 #1 #2</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>4</td><td>register/password</td><td>注册②设置密码</td><td>#3</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>5</td><td>register/nickname</td><td>注册③昵称 + 头像</td><td>#4</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>头像上传依赖缺失接口</td></tr>
+<tr><td>6</td><td>trade/index</td><td>分类 / 列表 / 收藏 + 广告 Banner</td><td>#17 #18 #24</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>广告素材接口未定义，Banner 占位</td></tr>
+<tr><td>7</td><td>trade/category</td><td>分类列表 / 收藏</td><td>#18 #24</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>8</td><td>trade/detail</td><td>详情 / 收藏 / 卖家操作 / 联系卖家</td><td>#19 #22 #24 #36</td><td><span class="tag t-bad">❌ 不可用</span></td><td>联系卖家 → 跳到假聊天页</td></tr>
+<tr><td>9</td><td>trade/publish</td><td>发布 / 编辑二手 + 图片视频</td><td>#20 #21 #26</td><td><span class="tag t-bad">❌ 不可用</span></td><td>上传不可用 → 提交必被拒</td></tr>
+<tr><td>10</td><td>task/index</td><td>任务列表 + 广告 Banner</td><td>#15</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>Banner 占位</td></tr>
+<tr><td>11</td><td>task/detail</td><td>任务详情 / 联系负责人</td><td>#16 #36</td><td><span class="tag t-bad">❌ 不可用</span></td><td>联系负责人 → 跳到假聊天页</td></tr>
+<tr><td>12</td><td>forum/index</td><td>信息流 / 点赞 / 广告 / 举报入口</td><td>#27 #30 #45</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>广告位未落地 + 上报枚举不一致</td></tr>
+<tr><td>13</td><td>forum/detail</td><td>详情 / 点赞 / 收藏 / 评论 / 删除 / 举报</td><td>#29~#35</td><td><span class="tag t-bad">❌ 不可用</span></td><td><strong>发表评论 100% 失败</strong></td></tr>
+<tr><td>14</td><td>forum/publish</td><td>发帖 + 图片视频</td><td>#26 #28</td><td><span class="tag t-bad">❌ 不可用</span></td><td>上传不可用 → 提交必被拒</td></tr>
+<tr><td>15</td><td>forum/report</td><td>举报元数据 + 提交</td><td>#41 #42</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>16</td><td>message/index</td><td>消息通知列表（4 个 Tab）</td><td>无（硬编码）</td><td><span class="tag t-bad">❌ 不可用</span></td><td><strong>纯假数据，未接任何接口</strong></td></tr>
+<tr><td>17</td><td>message/chat</td><td>聊天会话 / 发消息</td><td>无（硬编码）</td><td><span class="tag t-bad">❌ 不可用</span></td><td><strong>纯假数据，未接任何接口</strong></td></tr>
+<tr><td>18</td><td>my/index</td><td>资料卡 / 概览 / 功能入口 / 未读角标</td><td>#14</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>未读数接口未调用，角标恒 0</td></tr>
+<tr><td>19</td><td>my/posts</td><td>我的发布 / 上下架 / 标记已售</td><td>#22 #23</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>20</td><td>my/favorites</td><td>收藏（二手+帖子）/ 取消收藏</td><td>#24 #25</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>21</td><td>my/profile</td><td>查看 / 编辑资料 + 头像</td><td>#10 #11 #26</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>头像上传依赖缺失接口</td></tr>
+<tr><td>22</td><td>my/security</td><td>更换手机号 / 修改密码</td><td>#0 #1 #12 #13</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>23</td><td>my/settings</td><td>退出登录 / 注销 / 黑名单入口</td><td>#8 #9</td><td><span class="tag t-ok">✅ 完善</span></td><td>—</td></tr>
+<tr><td>24</td><td>my/blacklist</td><td>黑名单列表 / 解除拉黑</td><td>#43 #44</td><td><span class="tag t-warn">⚠️ 部分</span></td><td>只能"解除"，全站没有"拉黑"入口</td></tr>
+<tr><td>25</td><td>my/contact-admin</td><td>联系管理员</td><td>无</td><td><span class="tag t-bad">❌ 不可用</span></td><td>跳转到假聊天页</td></tr>
+<tr><td>26</td><td>common/webview</td><td>内嵌网页</td><td>—</td><td><span class="tag t-ok">✅ 完善</span></td><td>静态页</td></tr>
+<tr><td>27</td><td>index/index</td><td>uni-app 默认 Hello 模板</td><td>—</td><td><span class="tag t-bad">❌ 不可用</span></td><td>死代码，pages.json 未注册</td></tr>
+</tbody>
+</table>
+
+<h2>二、联调实测结果</h2>
+<p class="note">真实打后端 74 条用例，通过 72 条。</p>
+<h3 class="ok-line">✔ 全部通过的模块（节选）</h3>
+<div class="card">
+<p><strong>账号体系</strong>：图形验证码、短信发送（三重限频）、注册全流程、密码登录、短信登录、密码错误提示、重置密码、修改密码、更换手机号、注销账号、退出后 token 黑名单即时失效 —— 全通过。</p>
+<p><strong>鉴权</strong>：无 token → 40101；伪造 token → 40101；越权操作 → 40301 正确拦截。</p>
+<p><strong>交易</strong>：分类（8 个）、游标分页、发布、编辑、下架 / 上架 / 标记已售、我的发布、收藏（含幂等）、我的收藏 —— 全通过；详情页正确<strong>不返回 contact 字段</strong>（隐私红线达成）。</p>
+<p><strong>任务 / 论坛 / 举报 / 拉黑</strong>：列表详情、发帖、点赞（幂等）、收藏、评论列表、评论点赞、删除帖子、举报、拉黑 / 解除 / 黑名单 —— 全通过。</p>
+<p><strong>敏感词</strong>：含"赌博"发帖 → 40002 正确拦截。<strong>埋点</strong>：批量上报成功，非法事件名 → 40001 拦截。</p>
+</div>
+
+<h3 class="bad-line">✘ 失败的用例（2 条，均为 P0）</h3>
+<table>
+<thead><tr><th>用例</th><th>期望</th><th>实际</th><th>根因</th></tr></thead>
+<tbody>
+<tr><td><code>POST /upload/token</code></td><td>code=0，返回 uploadUrl + fileKey + headers</td><td class="bad-line">code=50000 服务器内部错误</td><td>后端<strong>根本没有这个接口</strong>（13 个 Controller 无一处理）</td></tr>
+<tr><td><code>POST /forum/posts/{id}/comments</code></td><td>code=0</td><td class="bad-line">code=40001 被回复的评论不存在</td><td>前端传 <code>replyToCommentId=0</code>，后端把 0 当真实评论 ID 查库</td></tr>
+</tbody>
+</table>
+
+<h2>三、缺陷清单</h2>
+
+<h3>🔴 P0 — 核心功能完全不可用</h3>
+
+<div class="card p0">
+<h3><span class="badge b0">P0</span> B1｜OSS 上传接口未实现，前端 <code>/upload/token</code> 打空</h3>
+<p class="why">证据：<code>POST /upload/token</code>（带有效 token）返回 <code>50000</code>；后端 13 个 Controller 中无任何 upload/media 控制器；<code>application.yml</code> 里也没有 <code>oss.*</code> 配置。</p>
+<p class="why">影响：发布二手、发帖、换头像三条业务线的媒体上传全部失效（前端 <code>api/upload.uts</code> 直传流程第一步就断）。</p>
+</div>
+
+<div class="card p0">
+<h3><span class="badge b0">P0</span> B2｜发布二手 / 发帖必然失败（B1 的连锁后果）</h3>
+<p class="why">后端 <code>TradeServiceImpl.validateMedia()</code> 与 <code>ForumServiceImpl.validateMedia()</code> 强制"images 与 videoKey 至少其一"，否则 40001「图片与视频至少上传其一」。</p>
+<p class="why">因 B1 用户永远传不上图 → 提交必被拒。前端两个发布页也没有"必须至少一张图"的前置校验，用户得填完整页才吃到报错。<strong>结论：这两个发布页目前 0 可用。</strong></p>
+</div>
+
+<div class="card p0">
+<h3><span class="badge b0">P0</span> B3｜论坛"发表评论"100% 失败（前后端契约不一致）</h3>
+<p class="why">前端 <code>forum/detail.uvue:179</code> <code>const replyToCommentId = ref(0)</code>，第 464 行调用 <code>addComment(id, draft, 0)</code> → 非回复场景发出 <code>replyToCommentId: 0</code>。</p>
+<p class="why">后端 <code>ForumServiceImpl.java:335-338</code> 拿到非 null 的 0 后 <code>selectById(0)</code> → 查不到 → 抛「被回复的评论不存在」。</p>
+<p class="why">实测：传 0 → 40001；<strong>不传该字段或传 null → code=0 成功</strong>；回复真实评论 ID → 成功。即"顶层评论必然失败，只有回复某条评论才行"。</p>
+</div>
+
+<div class="card p0">
+<h3><span class="badge b0">P0</span> B4｜站内信（消息中心）整块是假数据，未接任何接口</h3>
+<p class="why">证据：<code>message/index.uvue:39-45</code> 写死 5 条消息；<code>message/chat.uvue:107-129</code> 按 type 写死 4 条气泡。两个文件<strong>没有任何 <code>import ... from api/</code></strong>。</p>
+<p class="why">未接接口：<code>sendMessage</code> / <code>getMessages</code> / <code>getConversations</code> / <code>getUnreadCount</code> 四个前端函数<strong>零调用</strong>（后端接口本身都正常）。</p>
+<p class="why">更严重：<code>trade/detail.uvue</code> 与 <code>task/detail.uvue</code> 已<strong>真实调用 <code>createConversation</code> 建好会话</strong>，再跳到 <code>/pages/message/chat?conversationId=xx</code>——但 <code>chat.uvue</code> 的 onLoad <strong>只读 type、完全忽略 conversationId</strong>，于是展示假消息。用户看到的"联系卖家 / 联系负责人"是假的。聊天页对方昵称也是写死的（"王老师"/"平台客服"/"卖家"）。</p>
+</div>
+
+<h3>🟠 P1 — 功能缺失 / 入口缺失</h3>
+
+<div class="card p1">
+<h3><span class="badge b1">P1</span> B5｜"拉黑用户"全站没有入口</h3>
+<p class="why">前端定义了 <code>blacklistUser</code> 但<strong>无任何页面调用</strong>；<code>message/chat.uvue:141-143</code> 的"···"菜单虽列了"拉黑用户"，但 <code>uni.showActionSheet</code> 没有 success 回调，点了没反应。现状：黑名单页只能"看列表 + 解除"，<strong>永远拉黑不了人</strong>。</p>
+</div>
+
+<div class="card p1">
+<h3><span class="badge b1">P1</span> B6｜埋点上报（需求要求的 5 事件）未落地</h3>
+<p class="why">前端 <code>reportEvents</code>（<code>POST /analytics/events</code>）<strong>零调用</strong>。需求文档写明"埋点 5 事件必须随 MVP 版本带上"，目前 App 端一个都没上报。</p>
+</div>
+
+<div class="card p1">
+<h3><span class="badge b1">P1</span> B7｜未读数轮询未实现</h3>
+<p class="why"><code>getUnreadCount</code> 零调用；后端 <code>UserServiceImpl.getSummary()</code> 里 unreadCount 硬编码返回 0。需求要求"会话页 5s / 前台 30s 轮询"，目前无轮询逻辑，"我的"页未读角标恒为 0。</p>
+</div>
+
+<div class="card p1">
+<h3><span class="badge b1">P1</span> B8｜广告位功能不完整</h3>
+<p class="why">后端 <code>FeedItemVO</code> 注释写明"本轮恒为 POST"——实测 <code>/forum/feed</code> 返回 4 条全部 <code>itemType=POST</code>，<strong>不返回任何 AD 素材</strong>。前端 <code>trade/index.uvue:6</code>、<code>task/index.uvue:6</code> 注释自认"未定义素材拉取接口，暂作占位"。附带：前端曝光上报用 <code>action='EXPOSURE'</code>（<code>forum/index.uvue:206</code>），而后端要求的枚举是 <code>IMPRESSION</code>。</p>
+</div>
+
+<h3>🟡 P2 — 健壮性与质量</h3>
+
+<div class="card p2">
+<h3><span class="badge b2">P2</span> B9｜单条广告上报无任何参数校验（可污染数据）</h3>
+<p class="why">实测：<code>{adId:1, slot:"GARBAGE", action:"GARBAGE"}</code> → <strong>code=0 直接入库</strong>；同样的值走批量形态 → 40001 正确拦截。根因：<code>AdReportDTO</code> 的 <code>@Pattern</code> 只加在内部类 <code>Item</code> 上，单条形态的顶层字段没加约束。叠加 B8，前端上报的 <code>EXPOSURE</code> 会被原样写库，统计口径对不上。</p>
+</div>
+
+<div class="card p2">
+<h3><span class="badge b2">P2</span> B10｜404 被吞成 50000，无法区分"接口不存在"与"服务器错误"</h3>
+<p class="why">实测：未知路径（带有效 token）→ <code>50000 服务器内部错误</code>。根因：<code>GlobalExceptionHandler</code> 的 <code>@ExceptionHandler(Exception.class)</code> 兜底把所有异常统一映射成 SERVER_ERROR——这也正是 B1 被"掩盖"成 50000 而非 404 的原因，排查时容易误判。</p>
+</div>
+
+<div class="card p2">
+<h3><span class="badge b2">P2</span> B11｜聊天页"举报 / 拉黑"菜单点了没反应</h3>
+<p class="why"><code>uni.showActionSheet</code> 无 success 回调，选项不生效（与 B5 同源）。</p>
+</div>
+
+<div class="card p2">
+<h3><span class="badge b2">P2</span> B12｜死代码页</h3>
+<p class="why"><code>pages/index/index.uvue</code> 是 uni-app 默认 Hello 模板，未被 <code>pages.json</code> 注册，也没有任何页面跳转过来，可直接清理。</p>
+</div>
+
+<h2>四、修复建议（按顺序）</h2>
+<div class="card">
+<h3>第一步 · 必须先做（否则发布类功能一直挂）</h3>
+<ol class="steps">
+<li><strong>补 <code>/upload/token</code> 接口</strong>：新建 upload 控制器 + <code>oss.*</code> 配置。要点：需登录态；返回 <code>uploadUrl</code>（带签名的 PUT 地址）、<code>fileKey</code>、<code>headers</code>，字段名必须和前端 <code>api/upload.uts</code> 读的完全一致。先别接真 OSS——本地先返回一个 Mock 地址把链路跑通，再换真签名。</li>
+<li><strong>发布页加前置校验</strong>：两个发布页提交前先判断"是否有图片或视频"，没有就本地提示。注意后端是"至少其一<strong>且不能同时有</strong>"两条规则。</li>
+</ol>
+<h3>第二步 · 契约对齐（小改动）</h3>
+<ol class="steps" start="3">
+<li><strong>修评论的 0 值问题</strong>：推荐改前端——<code>replyToCommentId</code> 为 0 时传 <code>null</code> 或不传；同时后端把 <code>replyToId != null</code> 收紧成 <code>replyToId != null &amp;&amp; replyToId &gt; 0</code>。两边都改最稳。</li>
+<li><strong>统一广告上报枚举</strong>：前端 <code>EXPOSURE</code> → <code>IMPRESSION</code>；给 <code>AdReportDTO</code> 顶层 <code>slot</code>/<code>action</code> 补 <code>@Pattern</code>，堵住单条形态校验漏洞。</li>
+</ol>
+<h3>第三步 · 功能补齐（工作量较大）</h3>
+<ol class="steps" start="5">
+<li><strong>接入站内信</strong>：消息列表用 <code>getConversations</code> 替换写死数组（注意返回结构 <code>{conversationId, peer, lastMessage, lastTime, unreadCount}</code>）；聊天页 onLoad 读 <code>conversationId</code>，用 <code>getMessages</code> 拉历史、<code>sendMessage</code> 发送；对方昵称头像从会话数据取。轮询用 <code>getUnreadCount</code>（会话页 5s、前台 30s、退后台停）。</li>
+<li><strong>补"拉黑"入口</strong>：聊天页菜单 / 帖子详情 / 物品详情加"拉黑用户"，接 <code>blacklistUser</code>，并给 showActionSheet 补 success 回调。</li>
+<li><strong>接埋点</strong>：App 启动、页面浏览、发布成功、广告曝光 / 点击五处调 <code>reportEvents</code>。</li>
+<li><strong>广告素材</strong>：需后端在信息流真正下发 AD 条目（含 <code>ad</code> 子对象），依赖产品先补全"素材拉取接口"定义。</li>
+</ol>
+<h3>顺手清理</h3>
+<ol class="steps" start="9">
+<li>删掉 <code>pages/index/index.uvue</code> 死代码页。</li>
+<li>给 <code>GlobalExceptionHandler</code> 单独加 404 分支（<code>NoResourceFoundException</code>），别再让不存在的接口伪装成"服务器内部错误"。</li>
+</ol>
+</div>
+
+<h2>五、测试环境与限制说明</h2>
+<div class="card">
+<p class="note">后端地址 <code>http://127.0.0.1:8080/api/v1</code>（前端 <code>api/request.uts</code> 写的是 <code>http://10.128.85.211:8080</code>，真机调试需与电脑同一 WiFi，该 IP 会随网络变化）。</p>
+<p class="note">验证码获取：为绕过短信网关"同号 1 分钟 1 条 / 每日 5 条 / IP 每日 20 条"限频，脚本在短信发送成功后从 Redis 读取真实验证码；个别场景直接向 Redis 注入验证码以保证用例可执行（<strong>不改变任何业务结论</strong>）。</p>
+<p class="note">图片上传路径用假 fileKey（如 <code>test/img1.png</code>）验证了发布逻辑本身可用——<strong>证明"发布失败"纯粹是上传接口缺失导致，不是发布逻辑有问题</strong>。</p>
+<p class="note">测试后数据库留下少量测试数据（用户 103/104/106、物品 9005、若干帖子评论），可自行清理。</p>
+</div>
+
+<div class="foot">API Tester ｜ 测试日期 2026-10-10 ｜ 质量状态：FAIL ｜ 放行建议：NO-GO（P0 四项修复前不建议进入联调验收）</div>
+</div>
+</body>
+</html>

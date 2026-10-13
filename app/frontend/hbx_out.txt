@@ -1,0 +1,2 @@
+﻿未检测到已打开的HBuilderX，请先执行cli open启动HBuilderX后再重试
+

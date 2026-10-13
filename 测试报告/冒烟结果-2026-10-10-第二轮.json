@@ -1,0 +1,170 @@
+[
+  {
+    "module": "登录注册",
+    "case": "注册两个补充用户",
+    "expect": "code=0",
+    "actual": "A=True B=True",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "图形验证码一次性(第二次复用被拒)",
+    "expect": "第二次 code=40003",
+    "actual": "第一次=40901 第二次=40003",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "已注册手机号再次注册被拦",
+    "expect": "code=40901",
+    "actual": "code=40901 msg=手机号已注册，请直接登录",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "登录注册",
+    "case": "非法手机号参数校验",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=mobile 手机号格式不正确",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "分页契约",
+    "case": "任务列表分页结构",
+    "expect": "含 list/nextCursor/hasMore",
+    "actual": "keys=['hasMore', 'list', 'nextCursor']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "分页契约",
+    "case": "论坛信息流列表分页结构",
+    "expect": "含 list/nextCursor/hasMore",
+    "actual": "keys=['hasMore', 'list', 'nextCursor']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "分页契约",
+    "case": "物品列表列表分页结构",
+    "expect": "含 list/nextCursor/hasMore",
+    "actual": "keys=['hasMore', 'list', 'nextCursor']",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-首页",
+    "case": "物品列表按分类过滤",
+    "expect": "列表内 categoryId 均为所查分类",
+    "actual": "条数=8 异常=[]",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "发起任务咨询会话 TASK_CONSULT",
+    "expect": "code=0 返回 conversationId",
+    "actual": "code=40001 data=None",
+    "ok": false,
+    "note": ""
+  },
+  {
+    "module": "站内信",
+    "case": "非法会话类型被拦",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=type 会话类型不合法",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "拉黑",
+    "case": "被拉黑方在会话内发消息被拦",
+    "expect": "code=40301",
+    "actual": "code=40301 msg=因拉黑关系，无法发送消息",
+    "ok": true,
+    "note": "若失败说明拉黑未作用于消息链路"
+  },
+  {
+    "module": "拉黑",
+    "case": "解除拉黑后发消息恢复",
+    "expect": "code=0",
+    "actual": "code=0",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-评论",
+    "case": "评论命中敏感词被拦",
+    "expect": "code=40002",
+    "actual": "code=40002 msg=内容包含敏感词「办证」，请修改后重新发布",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "论坛-评论",
+    "case": "评论超长内容被拦",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=content 评论内容不能超过 200 字",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-发布",
+    "case": "图片与视频同时传入被拦",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=图片与视频不能同时上传",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "交易-发布",
+    "case": "图片视频都不传被拦",
+    "expect": "code=40001",
+    "actual": "code=40001 msg=图片与视频至少上传其一",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "管理后台",
+    "case": "管理员登录-错误凭据",
+    "expect": "code!=0 且不是50000",
+    "actual": "code=40001 msg=用户名或密码错误",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "管理后台",
+    "case": "未登录访问管理接口",
+    "expect": "code=40101",
+    "actual": "code=40101 msg=请先登录管理后台",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "上传",
+    "case": "未登录请求直传签名",
+    "expect": "code=40101",
+    "actual": "code=40101",
+    "ok": true,
+    "note": ""
+  },
+  {
+    "module": "分页契约",
+    "case": "游标越界返回空列表",
+    "expect": "code=0 且 list 为空",
+    "actual": "code=0 条数=10",
+    "ok": false,
+    "note": ""
+  },
+  {
+    "module": "广告埋点",
+    "case": "埋点缺 deviceId",
+    "expect": "code=40001",
+    "actual": "code=0 msg=ok",
+    "ok": false,
+    "note": ""
+  }
+]

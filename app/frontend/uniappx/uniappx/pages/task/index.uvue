@@ -1,0 +1,294 @@
+<template>
+	<view class="page">
+		<nav-bar title="任务"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<!-- 广告 Banner：产品文档仅定义广告位（TASK_BANNER）与上报接口，未定义 App 端素材拉取接口，暂作占位 -->
+			<view class="banner">
+				<view class="ad-tag"><text class="ad-tag-text">广告</text></view>
+				<text class="banner-text">广告 Banner</text>
+			</view>
+
+			<!-- 首屏加载中 -->
+			<view v-if="loading && items.length == 0" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 首屏加载失败 -->
+			<view v-else-if="failed && items.length == 0" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<!-- 空数据 -->
+			<view v-else-if="items.length == 0" class="state">
+				<text class="state-text">暂无任务</text>
+			</view>
+
+			<!-- 任务信息流 -->
+			<view v-else>
+				<view class="task-card" v-for="(t, i) in items" :key="t.id" @click="onTask(t.id)">
+					<text class="tc-title">{{ t.title }}</text>
+					<text class="tc-brief">{{ t.summary }}</text>
+					<view class="task-meta">
+						<text class="tm-k">报酬说明</text>
+						<text class="tm-v">{{ t.rewardText }}</text>
+					</view>
+					<view class="task-meta">
+						<text class="tm-k">截止时间</text>
+						<text class="tm-v">{{ t.deadline }}</text>
+					</view>
+					<view v-if="t.coverUrl != ''" class="attachments">
+						<image class="att-img" :src="t.coverUrl" mode="aspectFill"></image>
+					</view>
+					<text class="task-publish">发布于 {{ t.publishTime }}</text>
+				</view>
+
+				<view class="foot">
+					<text v-if="loading" class="foot-text">加载中…</text>
+					<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+					<text v-else class="foot-text">上拉加载更多</text>
+				</view>
+			</view>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 任务首页（原型 10，需求文档 4.3.1/4.3.2）：广告位 + 任务信息流（对接《接口文档》#15）
+	import { onLoad } from '@dcloudio/uni-app'
+	import { getTaskList } from '../../api/task.uts'
+	import { trackPageView } from '../../utils/analytics.uts'
+
+	type TaskItem = {
+		id : number
+		title : string
+		summary : string
+		rewardText : string
+		publishTime : string
+		deadline : string
+		coverUrl : string
+	}
+
+	const PAGE_SIZE = 20
+
+	const items = ref<TaskItem[]>([])
+	const cursor = ref(0)
+	const hasMore = ref(true)
+	const loading = ref(false)
+	const failed = ref(false)
+
+	// reset=true 表示回到首页（cursor=0）；否则按 nextCursor 续拉
+	function parseTask(o : UTSJSONObject) : TaskItem {
+		const t : TaskItem = {
+			id: o.getNumber('id') ?? 0,
+			title: o.getString('title') ?? '',
+			summary: o.getString('summary') ?? '',
+			rewardText: o.getString('rewardText') ?? '',
+			publishTime: o.getString('publishTime') ?? '',
+			deadline: o.getString('deadline') ?? '',
+			coverUrl: o.getString('coverUrl') ?? ''
+		}
+		return t
+	}
+
+	function loadMore(reset : boolean) {
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			items.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getTaskList(cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				failed.value = true
+				return
+			}
+			const list = obj.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					items.value.push(parseTask(list[i]))
+				}
+			}
+			cursor.value = obj.getNumber('nextCursor') ?? 0
+			hasMore.value = obj.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onLoad((_) => {
+		// #46 埋点：页面浏览
+		trackPageView('task/index')
+		loadMore(true)
+	})
+
+
+	function reload() {
+		loadMore(true)
+	}
+
+
+	function onScrollLower() {
+		if (!loading.value && hasMore.value) {
+			loadMore(false)
+		}
+	}
+
+	function onTask(id : number) {
+		uni.navigateTo({ url: '/pages/task/detail?id=' + id })
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.banner {
+		height: 253rpx;
+		border-radius: 28rpx;
+		background-image: linear-gradient(135deg, #ebebeb, #d6d6d6);
+		margin: 28rpx 32rpx;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.banner-text {
+		font-size: 28rpx;
+		color: #666666;
+		letter-spacing: 2rpx;
+	}
+
+	.ad-tag {
+		position: absolute;
+		top: 18rpx;
+		right: 18rpx;
+		background-color: rgba(0, 0, 0, 0.06);
+		border-radius: 8rpx;
+		padding: 4rpx 12rpx;
+	}
+
+	.ad-tag-text {
+		font-size: 21rpx;
+		color: #999999;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 140rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.task-card {
+		margin: 0 32rpx 24rpx 32rpx;
+		padding: 32rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #f1f1f1;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+	}
+
+	.tc-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #111111;
+	}
+
+	.tc-brief {
+		font-size: 27rpx;
+		line-height: 44rpx;
+		color: #666666;
+		margin-top: 14rpx;
+	}
+
+	.task-meta {
+		flex-direction: row;
+		align-items: center;
+		margin-top: 18rpx;
+	}
+
+	.tm-k {
+		width: 150rpx;
+		font-size: 25rpx;
+		color: #999999;
+	}
+
+	.tm-v {
+		flex: 1;
+		font-size: 26rpx;
+		color: #333333;
+	}
+
+	.attachments {
+		flex-direction: row;
+		margin-top: 20rpx;
+	}
+
+	.att-img {
+		width: 128rpx;
+		height: 128rpx;
+		border-radius: 14rpx;
+		background-color: #f2f2f2;
+	}
+
+	.task-publish {
+		font-size: 23rpx;
+		color: #bbbbbb;
+		margin-top: 22rpx;
+		padding-top: 18rpx;
+		border-top-width: 1px;
+		border-top-style: solid;
+		border-top-color: #f6f6f6;
+		text-align: right;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+</style>

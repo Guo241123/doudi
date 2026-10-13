@@ -1,0 +1,14 @@
+// 任务模块接口（App 只读，对应《接口文档》2.2）
+// 只读列表/详情页由页面自行渲染「加载中 / 失败重试 / 空」状态，故 manual=true 关闭统一 toast
+
+import { request } from './request.uts'
+
+// #15 任务信息流（游标分页：cursor 首页传 0，size 默认 20 上限 50）
+export function getTaskList(cursor : number, size : number) : Promise<any> {
+	return request({ url: '/tasks?cursor=' + cursor + '&size=' + size, method: 'GET', auth: false, manual: true })
+}
+
+// #16 任务详情
+export function getTaskDetail(id : number) : Promise<any> {
+	return request({ url: '/tasks/' + id, method: 'GET', auth: false, manual: true })
+}

@@ -1,0 +1,602 @@
+<template>
+	<view class="page">
+		<view :style="topStyle"></view>
+		<view class="login">
+			<view class="brand">
+				<view class="brand-mark">
+					<text class="brand-mark-text">邻</text>
+				</view>
+				<text class="brand-title">社区 · 交易</text>
+				<text class="brand-sub">任务 / 二手 / 论坛</text>
+			</view>
+
+			<view class="login-tabs">
+				<view class="lt-wrap" @click="switchMode('password')">
+					<text class="lt" :class="mode == 'password' ? 'lt-on' : ''">密码登录</text>
+					<view class="lt-bar" :class="mode == 'password' ? 'lt-bar-on' : ''"></view>
+				</view>
+				<view class="lt-wrap" @click="switchMode('sms')">
+					<text class="lt" :class="mode == 'sms' ? 'lt-on' : ''">验证码登录</text>
+					<view class="lt-bar" :class="mode == 'sms' ? 'lt-bar-on' : ''"></view>
+				</view>
+			</view>
+
+			<view class="field">
+				<text class="prefix">+86</text>
+				<input class="field-input" type="number" placeholder="请输入手机号" placeholder-class="ph" v-model="mobile" :maxlength="11" />
+			</view>
+
+			<!-- 密码登录 -->
+			<view v-if="mode == 'password'" class="field">
+				<input class="field-input" :password="!showPwd" placeholder="请输入密码" placeholder-class="ph" v-model="password" />
+				<view class="eye" @click="togglePwd">
+					<svg-icon :name="showPwd ? 'eye' : 'eye-off'" :size="40"></svg-icon>
+				</view>
+			</view>
+
+			<!-- 验证码登录 -->
+			<view v-if="mode == 'sms'" class="field">
+				<input class="field-input" type="number" placeholder="请输入验证码" placeholder-class="ph" v-model="smsCode" :maxlength="6" />
+				<text class="mini-btn" :class="countdown > 0 ? 'mini-btn-disabled' : ''" @click="onSendSms">{{ smsBtnText }}</text>
+			</view>
+
+			<view class="login-helper">
+				<template v-if="mode == 'password'">
+					<text class="helper-link" @click="onForgot">忘记密码？</text>
+					<text class="helper-link" @click="switchMode('sms')">验证码登录 ›</text>
+				</template>
+				<template v-else>
+					<text class="helper-link" @click="switchMode('password')">密码登录 ›</text>
+					<text class="helper-gray">未注册手机号请先注册</text>
+				</template>
+			</view>
+
+			<view class="btn-dark" :class="submitting ? 'btn-disabled' : ''" @click="onLogin">
+				<text class="btn-dark-text">{{ submitting ? '登录中…' : '登录' }}</text>
+			</view>
+
+			<view class="agree" @click="toggleAgree">
+				<view class="checkbox" :class="agreed ? 'checkbox-on' : ''">
+					<text v-if="agreed" class="checkbox-tick">✓</text>
+				</view>
+				<text class="agree-text">我已阅读并同意《用户协议》与《隐私政策》</text>
+			</view>
+
+			<view class="btn-ghost" @click="onGuest">
+				<text class="btn-ghost-text">游客浏览 →</text>
+			</view>
+
+			<view class="login-switch">
+				<text class="switch-text">还没有账号？</text>
+				<text class="switch-link" @click="onRegister">立即注册</text>
+			</view>
+		</view>
+
+		<captcha-popup v-if="showCaptcha" :image-src="captchaImg" :loading="captchaLoading"
+			@confirm="onCaptchaConfirm" @refresh="loadCaptcha" @close="onCaptchaClose"></captcha-popup>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 登录页（原型 1 / 2，需求文档 4.1.1）：密码登录 · 验证码登录 双 Tab，对接《接口文档》#5/#6
+	import { onLoad, onUnload } from '@dcloudio/uni-app'
+	import { getCaptcha, sendSms, loginByPassword, loginBySms } from '../../api/auth.uts'
+	import { errorCode, errorMessage } from '../../api/request.uts'
+	import { setToken, setUser, setMobile, isLogin } from '../../utils/token.uts'
+	import { isMobile } from '../../utils/validate.uts'
+
+	const mode = ref('password') // password | sms
+	const mobile = ref('')
+	const password = ref('')
+	const smsCode = ref('')
+	const showPwd = ref(false)
+	const agreed = ref(false)
+	const submitting = ref(false)
+	const countdown = ref(0)
+
+	// 图形验证码弹窗
+	const showCaptcha = ref(false)
+	const captchaImg = ref('')
+	const captchaLoading = ref(false)
+	const captchaId = ref('')
+
+	let timer : number = -1
+
+	const topStyle = computed<string>(() : string => {
+		const info = uni.getSystemInfoSync()
+		const h : number | null = info.statusBarHeight
+		return 'height:' + (h == null ? 20 : h) + 'px;'
+	})
+
+	const smsBtnText = computed<string>(() : string => {
+		if (countdown.value > 0) {
+			return countdown.value.toString() + 's'
+		}
+		return '获取验证码'
+	})
+
+	onLoad((_) => {
+		// 已登录则直接进入主流程
+		if (isLogin()) {
+			uni.switchTab({ url: '/pages/trade/index' })
+		}
+	})
+
+	function stopCountdown() {
+		if (timer != -1) {
+			clearInterval(timer)
+			timer = -1
+		}
+	}
+
+	onUnload(() => {
+		stopCountdown()
+	})
+
+
+	function startCountdown() {
+		stopCountdown()
+		countdown.value = 60
+		timer = setInterval(() => {
+			if (countdown.value <= 1) {
+				countdown.value = 0
+				stopCountdown()
+			} else {
+				countdown.value = countdown.value - 1
+			}
+		}, 1000)
+	}
+
+	function switchMode(m : string) {
+		mode.value = m
+	}
+
+	function togglePwd() {
+		showPwd.value = !showPwd.value
+	}
+
+	function toggleAgree() {
+		agreed.value = !agreed.value
+	}
+
+	function loadCaptcha() {
+		captchaLoading.value = true
+		getCaptcha().then((data) => {
+			const obj = data as UTSJSONObject | null
+			if (obj == null) {
+				captchaLoading.value = false
+				uni.showToast({ title: '验证码获取失败', icon: 'none' })
+				return
+			}
+			captchaId.value = obj.getString('captchaId') ?? ''
+			const b64 = obj.getString('imageBase64') ?? ''
+			if (b64 == '') {
+				captchaImg.value = ''
+			} else if (b64.startsWith('data:')) {
+				captchaImg.value = b64
+			} else {
+				captchaImg.value = 'data:image/png;base64,' + b64
+			}
+			captchaLoading.value = false
+		}).catch((_) => {
+			captchaLoading.value = false
+			uni.showToast({ title: '验证码获取失败，请重试', icon: 'none' })
+		})
+	}
+
+	// ===== 图形验证码 =====
+	function openCaptcha() {
+		captchaImg.value = ''
+		captchaId.value = ''
+		showCaptcha.value = true
+		loadCaptcha()
+	}
+
+
+	function onCaptchaClose() {
+		showCaptcha.value = false
+	}
+
+	function goRegisterWithTip(content : string) {
+		uni.showModal({
+			title: '提示',
+			content: content,
+			confirmText: '去注册',
+			cancelText: '取消',
+			success: (r) => {
+				if (r.confirm) {
+					uni.navigateTo({ url: '/pages/register/mobile' })
+				}
+			}
+		})
+	}
+
+	function handleSmsError(e : any | null) {
+		const code = errorCode(e)
+		const msg = errorMessage(e)
+		if (code == 40003) {
+			uni.showToast({ title: '图形验证码错误，请重新输入', icon: 'none' })
+			openCaptcha()
+		} else if (code == 40401) {
+			goRegisterWithTip('该手机号还未注册，是否前往注册？')
+		} else if (code == 42901 || code == 40301) {
+			uni.showModal({ title: '无法发送验证码', content: msg, showCancel: false })
+		} else {
+			uni.showToast({ title: msg, icon: 'none' })
+		}
+	}
+
+	function doSendSms(cid : string, ccode : string) {
+		if (cid == '') {
+			uni.showToast({ title: '验证码已失效，请重新获取', icon: 'none' })
+			return
+		}
+		uni.showLoading({ title: '发送中', mask: true })
+		sendSms(mobile.value, 'LOGIN', cid, ccode).then((data) => {
+			uni.hideLoading()
+			const obj = data as UTSJSONObject | null
+			const left = obj == null ? -1 : (obj.getNumber('leftToday') ?? -1)
+			if (left >= 0) {
+				uni.showToast({ title: '验证码已发送，今日还可发送 ' + left.toString() + ' 次', icon: 'none' })
+			} else {
+				uni.showToast({ title: '验证码已发送', icon: 'none' })
+			}
+			startCountdown()
+		}).catch((e) => {
+			uni.hideLoading()
+			handleSmsError(e)
+		})
+	}
+
+	function onCaptchaConfirm(code : string) {
+		showCaptcha.value = false
+		doSendSms(captchaId.value, code)
+	}
+
+	// ===== 发送短信验证码（#1）=====
+	function onSendSms() {
+		if (countdown.value > 0) {
+			return
+		}
+		if (!isMobile(mobile.value)) {
+			uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+			return
+		}
+		openCaptcha()
+	}
+
+
+
+	function afterLogin(data : any) {
+		const obj = data as UTSJSONObject | null
+		if (obj == null) {
+			uni.showToast({ title: '登录失败，请重试', icon: 'none' })
+			return
+		}
+		const token = obj.getString('token') ?? ''
+		if (token == '') {
+			uni.showToast({ title: '登录失败，请重试', icon: 'none' })
+			return
+		}
+		setToken(token)
+		setMobile(mobile.value)
+		const user = obj['user'] as UTSJSONObject | null
+		if (user != null) {
+			setUser(user)
+		}
+		uni.switchTab({ url: '/pages/trade/index' })
+	}
+
+	function handleLoginError(e : any | null) {
+		const code = errorCode(e)
+		const msg = errorMessage(e)
+		if (code == 40401) {
+			goRegisterWithTip('账号不存在，是否前往注册？')
+		} else if (code == 40301 || code == 42902) {
+			uni.showModal({ title: '无法登录', content: msg, showCancel: false })
+		} else {
+			uni.showToast({ title: msg, icon: 'none' })
+		}
+	}
+
+	// ===== 登录（#5 密码 / #6 验证码）=====
+	function onLogin() {
+		if (submitting.value) {
+			return
+		}
+		if (!isMobile(mobile.value)) {
+			uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+			return
+		}
+		if (mode.value == 'password') {
+			if (password.value == '') {
+				uni.showToast({ title: '请输入密码', icon: 'none' })
+				return
+			}
+		} else {
+			if (smsCode.value.length != 6) {
+				uni.showToast({ title: '请输入 6 位验证码', icon: 'none' })
+				return
+			}
+		}
+		if (!agreed.value) {
+			uni.showToast({ title: '请先阅读并同意用户协议与隐私政策', icon: 'none' })
+			return
+		}
+
+		submitting.value = true
+		const task = mode.value == 'password'
+			? loginByPassword(mobile.value, password.value)
+			: loginBySms(mobile.value, smsCode.value)
+
+		task.then((data) => {
+			submitting.value = false
+			afterLogin(data)
+		}).catch((e) => {
+			submitting.value = false
+			handleLoginError(e)
+		})
+	}
+
+
+
+
+	function onForgot() {
+		uni.navigateTo({ url: '/pages/login/forgot' })
+	}
+
+	function onGuest() {
+		uni.switchTab({ url: '/pages/trade/index' })
+	}
+
+	function onRegister() {
+		uni.navigateTo({ url: '/pages/register/mobile' })
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.login {
+		flex: 1;
+		flex-direction: column;
+		padding: 60rpx 60rpx 60rpx 60rpx;
+	}
+
+	.brand {
+		flex-direction: column;
+		margin-bottom: 20rpx;
+	}
+
+	.brand-mark {
+		width: 122rpx;
+		height: 122rpx;
+		border-radius: 35rpx;
+		background-color: #111111;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.brand-mark-text {
+		font-size: 46rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.brand-title {
+		font-size: 45rpx;
+		font-weight: 700;
+		color: #111111;
+		margin-top: 42rpx;
+	}
+
+	.brand-sub {
+		font-size: 28rpx;
+		color: #aaaaaa;
+		margin-top: 14rpx;
+		letter-spacing: 4rpx;
+	}
+
+	.login-tabs {
+		flex-direction: row;
+		margin-top: 56rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.lt-wrap {
+		flex-direction: column;
+		margin-right: 44rpx;
+	}
+
+	.lt {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #bbbbbb;
+		padding-bottom: 22rpx;
+	}
+
+	.lt-on {
+		color: #111111;
+	}
+
+	.lt-bar {
+		height: 4rpx;
+		border-radius: 4rpx;
+		background-color: transparent;
+		margin-bottom: -1rpx;
+	}
+
+	.lt-bar-on {
+		background-color: #111111;
+	}
+
+	.field {
+		flex-direction: row;
+		align-items: center;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+		padding: 33rpx 0;
+		margin-top: 14rpx;
+	}
+
+	.prefix {
+		font-size: 30rpx;
+		color: #555555;
+		padding-right: 24rpx;
+		margin-right: 24rpx;
+		border-right-width: 1px;
+		border-right-style: solid;
+		border-right-color: #ededed;
+	}
+
+	.field-input {
+		flex: 1;
+		font-size: 30rpx;
+		color: #111111;
+	}
+
+	.ph {
+		color: #c2c2c2;
+		font-size: 30rpx;
+	}
+
+	.eye {
+		padding-left: 20rpx;
+	}
+
+	.mini-btn {
+		font-size: 24rpx;
+		color: #111111;
+		background-color: #ffffff;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 12rpx;
+		padding: 10rpx 20rpx;
+	}
+
+	.mini-btn-disabled {
+		color: #c4c4c4;
+		border-color: #ececec;
+	}
+
+	.login-helper {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-top: 28rpx;
+	}
+
+	.helper-link {
+		font-size: 24rpx;
+		color: #888888;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #dddddd;
+		padding-bottom: 2rpx;
+	}
+
+	.helper-gray {
+		font-size: 22rpx;
+		color: #c4c4c4;
+	}
+
+	.btn-dark {
+		background-color: #111111;
+		border-radius: 22rpx;
+		padding: 33rpx;
+		align-items: center;
+		margin-top: 48rpx;
+	}
+
+	.btn-disabled {
+		opacity: 0.6;
+	}
+
+	.btn-dark-text {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.agree {
+		flex-direction: row;
+		align-items: flex-start;
+		margin-top: 36rpx;
+	}
+
+	.checkbox {
+		width: 30rpx;
+		height: 30rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #cccccc;
+		border-radius: 8rpx;
+		align-items: center;
+		justify-content: center;
+		margin-top: 4rpx;
+	}
+
+	.checkbox-on {
+		background-color: #111111;
+		border-color: #111111;
+	}
+
+	.checkbox-tick {
+		font-size: 20rpx;
+		color: #ffffff;
+	}
+
+	.agree-text {
+		flex: 1;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 38rpx;
+		margin-left: 14rpx;
+	}
+
+	.btn-ghost {
+		margin-top: auto;
+		background-color: #ffffff;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 22rpx;
+		padding: 30rpx;
+		align-items: center;
+	}
+
+	.btn-ghost-text {
+		font-size: 30rpx;
+		color: #111111;
+	}
+
+	.login-switch {
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		margin-top: 36rpx;
+	}
+
+	.switch-text {
+		font-size: 24rpx;
+		color: #aaaaaa;
+	}
+
+	.switch-link {
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #111111;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #111111;
+		padding-bottom: 2rpx;
+		margin-left: 6rpx;
+	}
+</style>

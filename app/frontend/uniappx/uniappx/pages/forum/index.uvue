@@ -1,0 +1,413 @@
+<template>
+	<view class="page">
+		<nav-bar title="论坛" right-icon="pencil" @right="onPublish"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<!-- 首屏加载中 -->
+			<view v-if="loading && items.length == 0" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 首屏加载失败 -->
+			<view v-else-if="failed && items.length == 0" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<!-- 空数据 -->
+			<view v-else-if="items.length == 0" class="state">
+				<text class="state-text">还没有帖子，来发布第一条吧</text>
+			</view>
+
+			<!-- 信息流：帖子 / 广告混排（公告帖固定在最前，见 #27） -->
+			<template v-else>
+				<view class="feed-item" v-for="(it, i) in items" :key="i">
+					<view v-if="it.itemType == 'AD'" class="ad-card" @click="onAd(it)">
+						<image v-if="it.adMaterialUrl != ''" class="ad-img" :src="it.adMaterialUrl" mode="aspectFill"></image>
+						<view v-else class="ad-img ad-img-empty"><text class="ad-img-text">广告</text></view>
+						<view class="ad-body">
+							<text class="ad-t">信息流广告</text>
+							<text class="ad-d">点击了解详情</text>
+						</view>
+						<view class="ad-flag"><text class="ad-flag-text">广告</text></view>
+					</view>
+
+					<post-card
+						v-else
+						:nickname="it.nickname"
+						:avatar="it.avatar"
+						:time="it.time"
+						:content="it.content"
+						:images="it.images"
+						:video-url="it.videoUrl"
+						:announce="it.announce"
+						:liked="it.liked"
+						:like-count="it.likeCount"
+						:comment-count="it.commentCount"
+						:hot-author="it.hotAuthor"
+						:hot-text="it.hotText"
+						:hot-like="it.hotLike"
+						@select="onSelect(it)"
+						@like="onLike(i)"
+						@comment="onComment(it)"
+						@report="onReport(it)"></post-card>
+				</view>
+
+				<view class="foot">
+					<text v-if="loading" class="foot-text">加载中…</text>
+					<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+					<text v-else class="foot-text">上拉加载更多</text>
+				</view>
+			</template>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 论坛首页（需求 4.4.1，原型 12）：信息流（帖子/广告混排）+ 公告帖 + 高赞评论预览 + 发布入口
+	// 对接《接口文档》#27 信息流、#30 帖子点赞/取消、#45 广告曝光/点击上报
+	import { onShow } from '@dcloudio/uni-app'
+	import { getFeed, likePost, unlikePost } from '../../api/forum.uts'
+	import { reportAd } from '../../api/ads.uts'
+	import { isLogin } from '../../utils/token.uts'
+	import { trackPageView } from '../../utils/analytics.uts'
+
+	type FeedItem = {
+		itemType : string
+		id : number
+		nickname : string
+		avatar : string
+		time : string
+		content : string
+		images : string[]
+		videoUrl : string
+		liked : boolean
+		likeCount : number
+		commentCount : number
+		hotAuthor : string
+		hotText : string
+		hotLike : number
+		announce : boolean
+		adId : number
+		adSlot : string
+		adMaterialUrl : string
+		adJumpType : string
+	}
+
+	const PAGE_SIZE = 20
+
+	const items = ref<FeedItem[]>([])
+	const cursor = ref(0)
+	const hasMore = ref(true)
+	const loading = ref(false)
+	const failed = ref(false)
+
+	function emptyItem() : FeedItem {
+		const imgs : string[] = []
+		const it : FeedItem = {
+			itemType: 'POST', id: 0, nickname: '', avatar: '', time: '', content: '',
+			images: imgs, videoUrl: '', liked: false, likeCount: 0, commentCount: 0,
+			hotAuthor: '', hotText: '', hotLike: 0, announce: false,
+			adId: 0, adSlot: '', adMaterialUrl: '', adJumpType: ''
+		}
+		return it
+	}
+
+	function parseItem(o : UTSJSONObject) : FeedItem {
+		const it = emptyItem()
+		it.itemType = o.getString('itemType') ?? 'POST'
+		it.id = o.getNumber('id') ?? 0
+
+		if (it.itemType == 'AD') {
+			const ad = o.getJSON('ad')
+			if (ad != null) {
+				it.adId = ad.getNumber('adId') ?? 0
+				it.adSlot = ad.getString('slot') ?? ''
+				it.adMaterialUrl = ad.getString('materialUrl') ?? ''
+				it.adJumpType = ad.getString('jumpType') ?? ''
+			}
+			return it
+		}
+
+		const author = o.getJSON('author')
+		if (author != null) {
+			it.nickname = author.getString('nickname') ?? ''
+			it.avatar = author.getString('avatar') ?? ''
+		}
+		it.time = o.getString('publishTime') ?? ''
+		it.content = o.getString('content') ?? ''
+		it.likeCount = o.getNumber('likeCount') ?? 0
+		it.commentCount = o.getNumber('commentCount') ?? 0
+		it.liked = o.getBoolean('liked') ?? false
+		it.announce = o.getBoolean('isAnnouncement') ?? false
+
+		const media = o.getArray<UTSJSONObject>('media')
+		const imgs : string[] = []
+		if (media != null) {
+			for (let i = 0; i < media.length; i++) {
+				const m = media[i]
+				const type = m.getString('type') ?? 'IMAGE'
+				const url = m.getString('url') ?? ''
+				if (url == '') {
+					continue
+				}
+				if (type == 'VIDEO') {
+					if (it.videoUrl == '') {
+						it.videoUrl = url
+					}
+				} else {
+					imgs.push(url)
+				}
+			}
+		}
+		it.images = imgs
+
+		// 高赞评论预览：取第一条（#27 hotComments）
+		const hot = o.getArray<UTSJSONObject>('hotComments')
+		if (hot != null && hot.length > 0) {
+			const h = hot[0]
+			const ha = h.getJSON('author')
+			if (ha != null) {
+				it.hotAuthor = ha.getString('nickname') ?? ''
+			}
+			it.hotText = h.getString('content') ?? ''
+		}
+		return it
+	}
+
+	// reset=true 回到首页（cursor=0）；否则按 nextCursor 续拉
+	function loadMore(reset : boolean) {
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			items.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getFeed(cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					const it = parseItem(list[i])
+					items.value.push(it)
+					if (it.itemType == 'AD' && it.adId > 0) {
+						// 枚举与后端对齐：IMPRESSION（曝光）/ CLICK（点击）
+						reportAd(it.adId, it.adSlot, 'IMPRESSION').catch((_) => {
+						})
+					}
+				}
+			}
+			cursor.value = o.getNumber('nextCursor') ?? 0
+			hasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	function reload() {
+		loadMore(true)
+	}
+
+	onShow(() => {
+		// #46 埋点：页面浏览
+		trackPageView('forum/index')
+		loadMore(true)
+	})
+
+	function onScrollLower() {
+		if (!loading.value && hasMore.value) {
+			loadMore(false)
+		}
+	}
+
+	function goLogin() {
+		uni.showModal({
+			title: '提示',
+			content: '该操作需要先登录',
+			confirmText: '去登录',
+			cancelText: '取消',
+			success: (r) => {
+				if (r.confirm) {
+					uni.navigateTo({ url: '/pages/login/index' })
+				}
+			}
+		})
+	}
+
+	// 点赞 / 取消点赞（#30 幂等，返回 { likeCount, liked }）
+	function onLike(index : number) {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		const it = items.value[index]
+		const apply = (data : any) => {
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				return
+			}
+			it.likeCount = o.getNumber('likeCount') ?? it.likeCount
+			it.liked = o.getBoolean('liked') ?? it.liked
+		}
+		if (it.liked) {
+			unlikePost(it.id).then(apply).catch((_) => {
+			})
+		} else {
+			likePost(it.id).then(apply).catch((_) => {
+			})
+		}
+	}
+
+	function onSelect(it : FeedItem) {
+		uni.navigateTo({ url: '/pages/forum/detail?id=' + it.id })
+	}
+
+	function onComment(it : FeedItem) {
+		uni.navigateTo({ url: '/pages/forum/detail?id=' + it.id + '&focus=1' })
+	}
+
+	function onReport(it : FeedItem) {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.navigateTo({ url: '/pages/forum/report?targetType=POST&targetId=' + it.id })
+	}
+
+	function onAd(it : FeedItem) {
+		reportAd(it.adId, it.adSlot, 'CLICK').catch((_) => {
+		})
+		uni.showToast({ title: '广告位', icon: 'none' })
+	}
+
+	function onPublish() {
+		if (!isLogin()) {
+			goLogin()
+			return
+		}
+		uni.navigateTo({ url: '/pages/forum/publish' })
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.feed-item {
+		flex-direction: column;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 160rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.ad-card {
+		flex-direction: row;
+		align-items: center;
+		margin: 24rpx 32rpx;
+		padding: 20rpx;
+		border-radius: 20rpx;
+		background-color: #f7f7f7;
+		position: relative;
+	}
+
+	.ad-img {
+		width: 120rpx;
+		height: 120rpx;
+		border-radius: 14rpx;
+		background-color: #ececec;
+	}
+
+	.ad-img-empty {
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ad-img-text {
+		font-size: 24rpx;
+		color: #b5b5b5;
+	}
+
+	.ad-body {
+		flex: 1;
+		margin-left: 22rpx;
+	}
+
+	.ad-t {
+		font-size: 29rpx;
+		font-weight: 600;
+		color: #333333;
+	}
+
+	.ad-d {
+		font-size: 24rpx;
+		color: #999999;
+		margin-top: 8rpx;
+	}
+
+	.ad-flag {
+		position: absolute;
+		top: 16rpx;
+		right: 16rpx;
+		background-color: rgba(0, 0, 0, 0.06);
+		border-radius: 8rpx;
+		padding: 4rpx 12rpx;
+	}
+
+	.ad-flag-text {
+		font-size: 20rpx;
+		color: #999999;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+</style>

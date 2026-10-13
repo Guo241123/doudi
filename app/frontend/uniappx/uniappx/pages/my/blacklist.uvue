@@ -1,0 +1,247 @@
+<template>
+	<view class="page">
+		<nav-bar title="黑名单管理" :show-back="true"></nav-bar>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<view v-if="loading && users.length == 0" class="empty">
+				<text class="empty-text">加载中…</text>
+			</view>
+			<view v-else-if="failed && users.length == 0" class="empty">
+				<text class="empty-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="reload"><text class="retry-text">重新加载</text></view>
+			</view>
+			<view v-else-if="users.length == 0" class="empty">
+				<text class="empty-text">暂无拉黑用户</text>
+			</view>
+
+			<template v-else>
+				<view class="row" v-for="(u, i) in users" :key="u.userId">
+					<image v-if="u.avatarUrl != ''" class="avatar-img" :src="u.avatarUrl" mode="aspectFill"></image>
+					<view v-else class="avatar"></view>
+					<view class="row-body">
+						<text class="row-nick">{{ u.nickname }}</text>
+						<text class="row-time">拉黑于 {{ u.blackTime }}</text>
+					</view>
+					<view class="unblock" @click="onUnblock(i)">
+						<text class="unblock-text">解除</text>
+					</view>
+				</view>
+
+				<view class="foot">
+					<text v-if="loading" class="foot-text">加载中…</text>
+					<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+				</view>
+			</template>
+
+			<text class="hint">被拉黑的用户无法查看你的帖子、评论与二手物品，也无法向你发起会话。</text>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 黑名单管理（需求 5.x 拉黑）：#44 列表（游标分页）+ #43 解除拉黑
+	import { onShow } from '@dcloudio/uni-app'
+	import { getBlacklist, unblacklistUser } from '../../api/report.uts'
+
+	type BlockedUser = {
+		userId : number
+		nickname : string
+		avatarUrl : string
+		blackTime : string
+	}
+
+	const PAGE_SIZE = 20
+
+	const users = ref<BlockedUser[]>([])
+	const cursor = ref(0)
+	const hasMore = ref(true)
+	const loading = ref(false)
+	const failed = ref(false)
+
+	function loadMore(reset : boolean) {
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			users.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getBlacklist(cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			const list = o.getArray<UTSJSONObject>('list')
+			if (list != null) {
+				for (let i = 0; i < list.length; i++) {
+					const b = list[i]
+					const item : BlockedUser = {
+						userId: b.getNumber('userId') ?? 0,
+						nickname: b.getString('nickname') ?? '',
+						avatarUrl: b.getString('avatarUrl') ?? '',
+						blackTime: b.getString('blackTime') ?? ''
+					}
+					users.value.push(item)
+				}
+			}
+			cursor.value = o.getNumber('nextCursor') ?? 0
+			hasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	onShow(() => {
+		loadMore(true)
+	})
+
+	function reload() {
+		loadMore(true)
+	}
+
+
+	function onScrollLower() {
+		if (!loading.value && hasMore.value) {
+			loadMore(false)
+		}
+	}
+
+	function onUnblock(index : number) {
+		const u = users.value[index]
+		uni.showModal({
+			title: '解除拉黑',
+			content: '确定要将「' + u.nickname + '」移出黑名单吗？',
+			success: (res) => {
+				if (!res.confirm) {
+					return
+				}
+				unblacklistUser(u.userId).then((_) => {
+					const arr : BlockedUser[] = []
+					for (let i = 0; i < users.value.length; i++) {
+						if (i != index) {
+							arr.push(users.value[i])
+						}
+					}
+					users.value = arr
+					uni.showToast({ title: '已解除', icon: 'none' })
+				}).catch((_) => {
+				})
+			}
+		})
+	}
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.empty {
+		flex-direction: column;
+		padding: 120rpx 0;
+		align-items: center;
+	}
+
+	.empty-text {
+		font-size: 27rpx;
+		color: #bbbbbb;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.row {
+		flex-direction: row;
+		align-items: center;
+		padding: 28rpx 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f4f4f4;
+	}
+
+	.avatar {
+		width: 80rpx;
+		height: 80rpx;
+		border-radius: 40rpx;
+		background-color: #eaeaea;
+	}
+
+	.avatar-img {
+		width: 80rpx;
+		height: 80rpx;
+		border-radius: 40rpx;
+	}
+
+	.row-body {
+		flex: 1;
+		margin-left: 22rpx;
+	}
+
+	.row-nick {
+		font-size: 29rpx;
+		font-weight: 600;
+		color: #222222;
+	}
+
+	.row-time {
+		font-size: 23rpx;
+		color: #aaaaaa;
+		margin-top: 8rpx;
+	}
+
+	.unblock {
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 12rpx;
+		padding: 10rpx 24rpx;
+	}
+
+	.unblock-text {
+		font-size: 25rpx;
+		color: #111111;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+
+	.hint {
+		font-size: 23rpx;
+		line-height: 38rpx;
+		color: #aaaaaa;
+		padding: 28rpx 32rpx;
+	}
+</style>

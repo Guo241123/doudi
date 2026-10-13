@@ -1,0 +1,363 @@
+<template>
+	<view class="page">
+		<nav-bar title="消息通知" :show-back="true"></nav-bar>
+
+		<view class="tabs">
+			<text class="tab" v-for="(t, i) in tabs" :key="i" :class="tab == i ? 'tab-on' : ''" @click="onTab(i)">{{ t.label }}</text>
+		</view>
+
+		<scroll-view class="body" :scroll-y="true" :lower-threshold="120" @scrolltolower="onScrollLower">
+			<!-- 未登录 -->
+			<view v-if="!logged" class="state">
+				<text class="state-text">登录后可查看消息</text>
+				<view class="retry" @click="goLogin"><text class="retry-text">去登录</text></view>
+			</view>
+
+			<!-- 首屏加载中 -->
+			<view v-else-if="loading && list.length == 0" class="state">
+				<text class="state-text">加载中…</text>
+			</view>
+
+			<!-- 加载失败 -->
+			<view v-else-if="failed && list.length == 0" class="state">
+				<text class="state-text">加载失败，请检查网络后重试</text>
+				<view class="retry" @click="load(true)"><text class="retry-text">重新加载</text></view>
+			</view>
+
+			<!-- 空 -->
+			<view v-else-if="list.length == 0" class="state">
+				<text class="state-text">暂无消息</text>
+				<text class="state-text state-sub">可在物品详情「联系卖家」或任务详情「联系负责人」发起对话</text>
+			</view>
+
+			<template v-else>
+				<view class="msg" v-for="(m, i) in list" :key="m.id" @click="onOpen(m)">
+					<view class="avatar">
+						<image v-if="m.avatarUrl != ''" class="avatar-img" :src="m.avatarUrl" mode="aspectFill"></image>
+						<text v-else class="avatar-text">{{ m.initial }}</text>
+					</view>
+					<view class="msg-body">
+						<view class="msg-top">
+							<text class="mt">{{ m.title }}</text>
+							<text class="mtime">{{ m.timeText }}</text>
+						</view>
+						<text class="md">{{ m.lastMessage }}</text>
+					</view>
+					<view v-if="m.unread > 0" class="badge">
+						<text class="badge-text">{{ m.unread > 99 ? '99+' : m.unread.toString() }}</text>
+					</view>
+				</view>
+
+				<view class="foot">
+					<text v-if="loading" class="foot-text">加载中…</text>
+					<text v-else-if="!hasMore" class="foot-text">没有更多了</text>
+					<text v-else class="foot-text">上拉加载更多</text>
+				</view>
+			</template>
+		</scroll-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 消息通知（原型 17）：接《接口文档》#37 会话列表
+	// 后端会话分三类（TASK_CONSULT / CUSTOMER / TRADE），故 Tab 按会话类型划分
+	import { onShow } from '@dcloudio/uni-app'
+	import { getConversations } from '../../api/message.uts'
+	import { isLogin } from '../../utils/token.uts'
+
+	type TabItem = {
+		label : string
+		value : string
+	}
+
+	type Conversation = {
+		id : number
+		type : string
+		title : string
+		initial : string
+		avatarUrl : string
+		lastMessage : string
+		timeText : string
+		unread : number
+	}
+
+	const PAGE_SIZE = 20
+
+	const tabs : TabItem[] = [
+		{ label: '全部', value: '' },
+		{ label: '任务', value: 'TASK_CONSULT' },
+		{ label: '交易', value: 'TRADE' },
+		{ label: '客服', value: 'CUSTOMER' }
+	]
+	const tab = ref(0)
+	const logged = ref(true)
+	const list = ref<Conversation[]>([])
+	const cursor = ref(0)
+	const hasMore = ref(true)
+	const loading = ref(false)
+	const failed = ref(false)
+
+	// 类型兜底文案（对方昵称为空时用）
+	function typeLabel(type : string) : string {
+		if (type == 'TASK_CONSULT') {
+			return '任务负责人'
+		}
+		if (type == 'TRADE') {
+			return '卖家'
+		}
+		return '平台客服'
+	}
+
+	function initialOf(name : string) : string {
+		return name.length > 0 ? name.substring(0, 1) : '消'
+	}
+
+	function timeTextOf(raw : string) : string {
+		if (raw.length >= 16) {
+			return raw.substring(0, 16)
+		}
+		return raw
+	}
+
+	function parseConversation(o : UTSJSONObject) : Conversation {
+		const peer = o.getJSON('peer')
+		const nick = peer == null ? '' : (peer.getString('nickname') ?? '')
+		const type = o.getString('type') ?? 'CUSTOMER'
+		const name = nick != '' ? nick : typeLabel(type)
+		const last = o.getString('lastMessage') ?? ''
+		return {
+			id: o.getNumber('conversationId') ?? 0,
+			type: type,
+			title: name,
+			initial: initialOf(name),
+			avatarUrl: peer == null ? '' : (peer.getString('avatarUrl') ?? ''),
+			lastMessage: last != '' ? last : '（暂无消息）',
+			timeText: timeTextOf(o.getString('lastTime') ?? ''),
+			unread: o.getNumber('unreadCount') ?? 0
+		}
+	}
+
+	function goLogin() {
+		uni.navigateTo({ url: '/pages/login/index' })
+	}
+
+	function load(reset : boolean) {
+		if (!isLogin()) {
+			logged.value = false
+			return
+		}
+		logged.value = true
+		if (loading.value) {
+			return
+		}
+		if (reset) {
+			cursor.value = 0
+			hasMore.value = true
+			failed.value = false
+			list.value = []
+		}
+		if (!hasMore.value) {
+			return
+		}
+
+		loading.value = true
+		getConversations(tabs[tab.value].value, cursor.value, PAGE_SIZE).then((data) => {
+			loading.value = false
+			const o = data as UTSJSONObject | null
+			if (o == null) {
+				failed.value = true
+				return
+			}
+			const arr = o.getArray<UTSJSONObject>('list')
+			if (arr != null) {
+				for (let i = 0; i < arr.length; i++) {
+					list.value.push(parseConversation(arr[i]))
+				}
+			}
+			cursor.value = o.getNumber('nextCursor') ?? 0
+			hasMore.value = o.getBoolean('hasMore') ?? false
+		}).catch((_) => {
+			loading.value = false
+			failed.value = true
+		})
+	}
+
+	function onOpen(m : Conversation) {
+		if (m.id <= 0) {
+			return
+		}
+		uni.navigateTo({ url: '/pages/message/chat?conversationId=' + m.id + '&type=' + m.type + '&title=' + encodeURIComponent(m.title) })
+	}
+
+	function onTab(i : number) {
+		if (tab.value == i) {
+			return
+		}
+		tab.value = i
+		load(true)
+	}
+
+	function onScrollLower() {
+		if (!loading.value && hasMore.value) {
+			load(false)
+		}
+	}
+
+	onShow(() => {
+		load(true)
+	})
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.tabs {
+		flex-direction: row;
+		align-items: center;
+		padding: 0 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.tab {
+		font-size: 29rpx;
+		color: #999999;
+		padding: 26rpx 0;
+		margin-right: 44rpx;
+		border-bottom-width: 4rpx;
+		border-bottom-style: solid;
+		border-bottom-color: transparent;
+	}
+
+	.tab-on {
+		color: #111111;
+		font-weight: 600;
+		border-bottom-color: #111111;
+	}
+
+	.body {
+		flex: 1;
+	}
+
+	.msg {
+		flex-direction: row;
+		align-items: center;
+		padding: 26rpx 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #f6f6f6;
+	}
+
+	.avatar {
+		width: 84rpx;
+		height: 84rpx;
+		border-radius: 42rpx;
+		background-color: #eaeaea;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.avatar-img {
+		width: 84rpx;
+		height: 84rpx;
+	}
+
+	.avatar-text {
+		font-size: 32rpx;
+		color: #999999;
+	}
+
+	.msg-body {
+		flex: 1;
+		margin-left: 22rpx;
+	}
+
+	.msg-top {
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.mt {
+		font-size: 29rpx;
+		font-weight: 600;
+		color: #111111;
+	}
+
+	.mtime {
+		font-size: 22rpx;
+		color: #bbbbbb;
+		margin-left: auto;
+	}
+
+	.md {
+		font-size: 26rpx;
+		line-height: 40rpx;
+		color: #666666;
+		margin-top: 10rpx;
+	}
+
+	.badge {
+		min-width: 36rpx;
+		height: 36rpx;
+		border-radius: 18rpx;
+		background-color: #e5484d;
+		align-items: center;
+		justify-content: center;
+		padding: 0 10rpx;
+		margin-left: 16rpx;
+	}
+
+	.badge-text {
+		font-size: 22rpx;
+		color: #ffffff;
+	}
+
+	.state {
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 160rpx 0;
+	}
+
+	.state-text {
+		font-size: 27rpx;
+		color: #999999;
+	}
+
+	.state-sub {
+		font-size: 24rpx;
+		color: #bbbbbb;
+		margin-top: 14rpx;
+		padding: 0 60rpx;
+		text-align: center;
+	}
+
+	.retry {
+		margin-top: 28rpx;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #dddddd;
+		border-radius: 999rpx;
+		padding: 14rpx 40rpx;
+	}
+
+	.retry-text {
+		font-size: 26rpx;
+		color: #111111;
+	}
+
+	.foot {
+		align-items: center;
+		padding: 20rpx 0 60rpx 0;
+	}
+
+	.foot-text {
+		font-size: 24rpx;
+		color: #bbbbbb;
+	}
+</style>

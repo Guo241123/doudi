@@ -1,0 +1,31 @@
+// 举报与拉黑接口（对应《接口文档》2.8）
+
+import { request } from './request.uts'
+
+// #41 举报页元数据（targetTypes / reasons 由后端下发，前端不写死）
+export function getReportMeta() : Promise<any> {
+	return request({ url: '/reports/meta', method: 'GET' })
+}
+
+// #42 提交举报
+export function submitReport(targetType : string, targetId : number, reason : string, description : string) : Promise<any> {
+	return request({
+		url: '/reports',
+		method: 'POST',
+		data: { targetType: targetType, targetId: targetId, reason: reason, description: description }
+	})
+}
+
+// #43 拉黑 / 解除
+export function blacklistUser(userId : number) : Promise<any> {
+	return request({ url: '/blacklist/' + userId, method: 'POST' })
+}
+
+export function unblacklistUser(userId : number) : Promise<any> {
+	return request({ url: '/blacklist/' + userId, method: 'DELETE' })
+}
+
+// #44 拉黑列表（页面自行渲染加载/失败/空态，故 manual=true）
+export function getBlacklist(cursor : number, size : number) : Promise<any> {
+	return request({ url: '/blacklist?cursor=' + cursor + '&size=' + size, method: 'GET', manual: true })
+}

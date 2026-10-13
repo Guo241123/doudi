@@ -1,0 +1,92 @@
+<template>
+	<view class="nav-wrap" :style="wrapStyle">
+		<view class="nav">
+			<view v-if="showBack" class="nav-back" @click="onBack">
+				<svg-icon name="back" :size="40"></svg-icon>
+			</view>
+			<text class="nav-title">{{ title }}</text>
+			<view class="nav-right" @click="onRight">
+				<text v-if="rightText != ''" class="nav-action">{{ rightText }}</text>
+				<svg-icon v-else-if="rightIcon != ''" :name="rightIcon" :size="40"></svg-icon>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 自定义导航栏（原型 navbar）：状态栏占位 + 可选返回 + 左对齐标题 + 右侧文字/图标
+	const props = defineProps<{
+		title : string
+		showBack ?: boolean
+		rightText ?: string
+		rightIcon ?: string
+	}>()
+
+	const emit = defineEmits<{
+		(e : 'back') : void
+		(e : 'right') : void
+	}>()
+
+	const statusBarHeight = computed<number>(() : number => {
+		const info = uni.getSystemInfoSync()
+		const h : number | null = info.statusBarHeight
+		if (h == null) {
+			return 20
+		}
+		return h
+	})
+
+	const wrapStyle = computed<string>(() : string => {
+		return 'padding-top:' + statusBarHeight.value + 'px;'
+	})
+
+	function onBack() {
+		emit('back')
+		if (getCurrentPages().length > 1) {
+			uni.navigateBack()
+		}
+	}
+
+	function onRight() {
+		emit('right')
+	}
+</script>
+
+<style>
+	.nav-wrap {
+		flex: none;
+		background-color: #ffffff;
+	}
+
+	.nav {
+		flex-direction: row;
+		align-items: center;
+		height: 108rpx;
+		padding: 0 32rpx;
+		border-bottom-width: 1px;
+		border-bottom-style: solid;
+		border-bottom-color: #ededed;
+	}
+
+	.nav-back {
+		margin-right: 16rpx;
+		margin-left: -8rpx;
+	}
+
+	.nav-title {
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #111111;
+	}
+
+	.nav-right {
+		margin-left: auto;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.nav-action {
+		font-size: 26rpx;
+		color: #999999;
+	}
+</style>

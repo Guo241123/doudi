@@ -1,0 +1,32 @@
+<template>
+	<view class="page">
+		<nav-bar :title="pageTitle" :show-back="true"></nav-bar>
+		<web-view class="wv" :src="url"></web-view>
+	</view>
+</template>
+
+<script setup lang="uts">
+	// 通用 WebView 页：隐私政策 / 用户协议 / 关于我们
+	import { onLoad } from '@dcloudio/uni-app'
+
+	const pageTitle = ref('详情')
+	const url = ref('https://example.com')
+
+	onLoad((query) => {
+		const t = query['title']
+		if (t != null) {
+			pageTitle.value = t as string
+		}
+	})
+</script>
+
+<style>
+	.page {
+		flex: 1;
+		background-color: #ffffff;
+	}
+
+	.wv {
+		flex: 1;
+	}
+</style>
